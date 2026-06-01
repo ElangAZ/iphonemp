@@ -196,32 +196,67 @@ function App() {
   };
 
   // 9:16 Canvas rendering loop and recorder engine
-  const startCanvasRenderLoop = (ctx, width, height, coverImgObj, isVideoActive, videoEl) => {
+  const startCanvasRenderLoop = (ctx, canvasWidth, canvasHeight, coverImgObj, isVideoActive, videoEl) => {
     let textScrollOffset = 0;
     
+    // Helper to draw image/video with object-fit: cover cropped-centering
+    const drawMediaCover = (media, x, y, w, h, r, isVideoType) => {
+      ctx.save();
+      ctx.beginPath();
+      ctx.roundRect(x, y, w, h, r);
+      ctx.clip();
+      
+      const mWidth = isVideoType ? (media.videoWidth || w) : (media.naturalWidth || w);
+      const mHeight = isVideoType ? (media.videoHeight || h) : (media.naturalHeight || h);
+      const mRatio = mWidth / mHeight;
+      const targetRatio = w / h;
+      
+      let sourceX = 0;
+      let sourceY = 0;
+      let sourceWidth = mWidth;
+      let sourceHeight = mHeight;
+      
+      if (mRatio > targetRatio) {
+        sourceWidth = mHeight * targetRatio;
+        sourceX = (mWidth - sourceWidth) / 2;
+      } else {
+        sourceHeight = mWidth / targetRatio;
+        sourceY = (mHeight - sourceHeight) / 2;
+      }
+      
+      ctx.drawImage(media, sourceX, sourceY, sourceWidth, sourceHeight, x, y, w, h);
+      ctx.restore();
+    };
+
     const renderFrame = () => {
-      // 1. Draw heavy blur background using cover art
-      ctx.clearRect(0, 0, width, height);
+      // 1. Draw heavy blur background using cover art (on physical canvas dimensions)
+      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
       ctx.save();
       
       if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
         ctx.filter = 'blur(80px) saturate(1.5) brightness(1.25)';
-        ctx.drawImage(coverImgObj, -200, -200, width + 400, height + 400);
+        ctx.drawImage(coverImgObj, -200, -200, canvasWidth + 400, canvasHeight + 400);
       } else {
         // Fallback dark gradient background
-        const bgGrad = ctx.createRadialGradient(width * 0.3, height * 0.2, 0, width * 0.3, height * 0.2, height);
+        const bgGrad = ctx.createRadialGradient(canvasWidth * 0.3, canvasHeight * 0.2, 0, canvasWidth * 0.3, canvasHeight * 0.2, canvasHeight);
         bgGrad.addColorStop(0, '#1e1b4b');
         bgGrad.addColorStop(0.4, '#0f0e1a');
         bgGrad.addColorStop(1, '#0a0a14');
         ctx.fillStyle = bgGrad;
-        ctx.fillRect(0, 0, width, height);
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       }
       ctx.restore();
 
-      // 2. Draw Floating Card Player Card (Centered in 9:16 layout)
-      // Scale coordinates based on 720x1280 target size
+      // 2. Translate and Scale logical coordinate space from 1080x1920 down to 720x1280
+      ctx.save();
+      ctx.scale(1.5, 1.5);
+      
+      const width = 720;
+      const height = 1280;
+
+      // Draw Floating Card Player Card (Centered in 720x1280 logical viewport space)
       const cardWidth = 560;
-      const cardHeight = 1000;
+      const cardHeight = 1050;
       const cardX = (width - cardWidth) / 2;
       const cardY = (height - cardHeight) / 2;
       const cardRadius = 75;
@@ -247,24 +282,23 @@ function App() {
       ctx.stroke();
       ctx.restore();
 
-      // 3. Draw Album Cover art inside the Card
+      // 3. Draw Album Cover art inside the Card with aspect ratio protection (Crop & Center)
       const artPadding = 35;
       const artSize = cardWidth - (artPadding * 2);
       const artX = cardX + artPadding;
       const artY = cardY + artPadding;
       const artRadius = 45;
 
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(artX, artY, artSize, artSize, artRadius);
-      ctx.clip();
-
       if (isVideoActive && videoEl && !videoEl.paused) {
-        ctx.drawImage(videoEl, artX, artY, artSize, artSize);
+        drawMediaCover(videoEl, artX, artY, artSize, artSize, artRadius, true);
       } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
-        ctx.drawImage(coverImgObj, artX, artY, artSize, artSize);
+        drawMediaCover(coverImgObj, artX, artY, artSize, artSize, artRadius, false);
       } else {
         // Placeholder music icon cover art
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+        ctx.clip();
         ctx.fillStyle = 'linear-gradient(135deg, #1e1e35 0%, #2d2d50 100%)';
         ctx.fillRect(artX, artY, artSize, artSize);
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
@@ -272,11 +306,11 @@ function App() {
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
         ctx.fillText('🎵', artX + artSize / 2, artY + artSize / 2);
+        ctx.restore();
       }
-      ctx.restore();
 
-      // 4. Song Info text
-      const infoY = artY + artSize + 60;
+      // 4. Song Info text (perfect luxurious spacing)
+      const infoY = artY + artSize + 55;
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 36px Inter';
       ctx.textAlign = 'left';
@@ -295,7 +329,8 @@ function App() {
         ctx.fillText(songTitle, cardX + artPadding + textScrollOffset, infoY);
         ctx.fillText(songTitle, cardX + artPadding + textScrollOffset + titleWidth + 100, infoY);
         
-        textScrollOffset -= 1.5;
+        // Smooth scrolling title: 0.6px per frame for a natural elegant speed
+        textScrollOffset -= 0.6;
         if (Math.abs(textScrollOffset) >= titleWidth + 100) {
           textScrollOffset = 0;
         }
@@ -307,10 +342,10 @@ function App() {
       // Draw Artist
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.font = '500 24px Inter';
-      ctx.fillText(songArtist, cardX + artPadding, infoY + 50);
+      ctx.fillText(songArtist, cardX + artPadding, infoY + 42);
 
       // 5. Seekbar
-      const seekY = infoY + 120;
+      const seekY = infoY + 95;
       const seekWidth = cardWidth - (artPadding * 2);
       
       // Track bg
@@ -332,21 +367,25 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '600 20px Inter';
       ctx.textAlign = 'left';
-      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 45);
+      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 35);
       
       ctx.textAlign = 'right';
       const remainingTime = duration > 0 ? (duration - currentTime) : 0;
-      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 45);
+      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 35);
 
-      // 6. Navigation Controls (Play/Pause, Skip buttons, Favorite Star)
-      const ctrlY = seekY + 130;
+      // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
+      const ctrlY = seekY + 90;
       const btnCenter = cardX + cardWidth / 2;
 
       // Skip Back (<<) - Left
       ctx.save();
-      ctx.translate(btnCenter - 110, ctrlY);
+      ctx.translate(btnCenter - 120, ctrlY);
       ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
       
       // polygon points="19 20 9 12 19 4 19 20"
       ctx.beginPath();
@@ -355,6 +394,7 @@ function App() {
       ctx.lineTo(19 - 12, 4 - 12);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
 
       // polygon points="9 20 2 12 9 4 9 20"
       ctx.beginPath();
@@ -363,9 +403,10 @@ function App() {
       ctx.lineTo(9 - 12, 4 - 12);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
       ctx.restore();
 
-      // Large Center Play / Pause Button
+      // Large Center Play / Pause Button (custom shape with stroke anti-aliasing)
       ctx.save();
       ctx.translate(btnCenter, ctrlY);
       ctx.scale(3.0, 3.0);
@@ -377,21 +418,29 @@ function App() {
         ctx.roundRect(14 - 12, 4 - 12, 4, 16, 1.5);
         ctx.fill();
       } else {
-        // Draw large robust Play triangle (7.5, 6.5, 16.5, 12, 7.5, 17.5)
+        // Draw large robust Play triangle with smooth stroke edges
         ctx.beginPath();
         ctx.moveTo(7.5 - 12, 6.5 - 12);
         ctx.lineTo(16.5 - 12, 12 - 12);
         ctx.lineTo(7.5 - 12, 17.5 - 12);
         ctx.closePath();
         ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.0;
+        ctx.lineJoin = 'round';
+        ctx.stroke();
       }
       ctx.restore();
 
       // Skip Forward (>>) - Right
       ctx.save();
-      ctx.translate(btnCenter + 110, ctrlY);
+      ctx.translate(btnCenter + 120, ctrlY);
       ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.2;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
 
       // polygon points="5 4 15 12 5 20 5 4"
       ctx.beginPath();
@@ -400,6 +449,7 @@ function App() {
       ctx.lineTo(5 - 12, 20 - 12);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
 
       // polygon points="15 4 22 12 15 20 15 4"
       ctx.beginPath();
@@ -408,67 +458,75 @@ function App() {
       ctx.lineTo(15 - 12, 20 - 12);
       ctx.closePath();
       ctx.fill();
+      ctx.stroke();
       ctx.restore();
 
-      // Favorite Star button (outline if false, solid white if true)
+      // 7. Volume bar (with scaled up, beautiful speaker icons)
+      const volY = ctrlY + 80;
+      const volX = cardX + artPadding + 48; // Shift slider to give space for larger speakers
+      const volWidth = cardWidth - (artPadding * 2) - 96;
+      
+      // Left low-volume speaker icon (Scaled up by 1.4x)
       ctx.save();
-      const starX = cardX + artPadding + 20;
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.fillStyle = '#ffffff';
-      ctx.lineWidth = 3;
-      ctx.translate(starX, ctrlY);
-      
+      ctx.translate(volX - 42, volY - 7);
+      ctx.scale(1.4, 1.4);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.beginPath();
-      // Draw 5-pointed star
-      const spikes = 5;
-      const outerRadius = 22;
-      const innerRadius = 9;
-      let rot = Math.PI / 2 * 3;
-      let x = 0;
-      let y = 0;
-      const step = Math.PI / spikes;
-
-      ctx.moveTo(0, -outerRadius);
-      for (let i = 0; i < spikes; i++) {
-        x = Math.cos(rot) * outerRadius;
-        y = Math.sin(rot) * outerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
-
-        x = Math.cos(rot) * innerRadius;
-        y = Math.sin(rot) * innerRadius;
-        ctx.lineTo(x, y);
-        rot += step;
-      }
-      ctx.lineTo(0, -outerRadius);
+      ctx.moveTo(9, 6);
+      ctx.lineTo(5, 9);
+      ctx.lineTo(2, 9);
+      ctx.lineTo(2, 15);
+      ctx.lineTo(5, 15);
+      ctx.lineTo(9, 18);
       ctx.closePath();
-      
-      if (isFavorited) {
-        ctx.fill();
-      } else {
-        ctx.stroke();
-      }
+      ctx.fill();
       ctx.restore();
 
-      // 7. Volume bar
-      const volY = ctrlY + 110;
-      const volX = cardX + artPadding;
-      const volWidth = cardWidth - (artPadding * 2);
-      
       // Volume track bg
       ctx.beginPath();
       ctx.roundRect(volX, volY, volWidth, 10, 5);
-      ctx.fillStyle = 'rgba(255,255,255,0.15)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
       ctx.fill();
 
       // Volume filled progress
       ctx.beginPath();
       ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
-      ctx.fillStyle = 'rgba(255,255,255,0.65)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.fill();
 
-      // 8. Device selector pill button at the bottom center
-      const pillY = volY + 90;
+      // Right high-volume speaker icon with waves (Scaled up by 1.4x)
+      ctx.save();
+      ctx.translate(volX + volWidth + 14, volY - 7);
+      ctx.scale(1.4, 1.4);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      
+      // Speaker body
+      ctx.beginPath();
+      ctx.moveTo(9, 6);
+      ctx.lineTo(5, 9);
+      ctx.lineTo(2, 9);
+      ctx.lineTo(2, 15);
+      ctx.lineTo(5, 15);
+      ctx.lineTo(9, 18);
+      ctx.closePath();
+      ctx.fill();
+
+      // Wave Arc 1
+      ctx.beginPath();
+      ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
+
+      // Wave Arc 2
+      ctx.beginPath();
+      ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
+      ctx.restore();
+
+      // 8. Device selector pill button at the bottom center (Perfect tight spacing)
+      const pillY = volY + 70;
       const pillWidth = 190;
       const pillHeight = 52;
       const pillX = btnCenter - pillWidth / 2;
@@ -510,6 +568,8 @@ function App() {
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
       ctx.fillText('senux', pillX + 66, pillY + 26);
+
+      ctx.restore(); // Restore scaled canvas context
 
       // Visualizer logic (Hidden CSS fallback keeps DOM loop from crashing)
       // Render loop repeats at screen refresh rate
@@ -714,8 +774,8 @@ function App() {
       {/* 9:16 portrait canvas used to capture frames (Hidden off-screen) */}
       <canvas 
         ref={canvasRef} 
-        width={720} 
-        height={1280} 
+        width={1080} 
+        height={1920} 
         style={{ display: 'none' }} 
       />
 
@@ -780,16 +840,7 @@ function App() {
 
           {/* Player controls */}
           <div className="controls">
-            {/* Star Favorite Button */}
-            <button 
-              className={`ctrl-btn small ${isFavorited ? 'favorited' : ''}`} 
-              id="starBtn" 
-              onClick={toggleFavorite}
-            >
-              <i className={isFavorited ? "fas fa-star" : "far fa-star"}></i>
-            </button>
-
-            {/* Middle Playback buttons */}
+            {/* Middle Playback buttons - centered without star */}
             <div className="control-center">
               <button className="ctrl-btn small">
                 <i className="fas fa-backward"></i>
@@ -814,22 +865,17 @@ function App() {
             </div>
           </div>
 
-          {/* Volume seek section */}
+          {/* Volume seek section with sleek speaker SVGs */}
           <div className="volume-section">
-            <div className="vol-icon">
-              <svg viewBox="0 0 24 24">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-              </svg>
-            </div>
+            <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3.667 8.167h3.5l4.666-4.667v17l-4.666-4.667h-3.5v-7.666z"/>
+            </svg>
             <div className="volume-track" onClick={handleVolumeChange}>
               <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
             </div>
-            <div className="vol-icon">
-              <svg viewBox="0 0 24 24">
-                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
-                <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" stroke="rgba(255,255,255,0.4)" strokeWidth="2" strokeLinecap="round" fill="none" />
-              </svg>
-            </div>
+            <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+            </svg>
           </div>
 
           {/* Bottom Device Selector Pill */}
