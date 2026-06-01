@@ -116,7 +116,7 @@ body {
 
 /* Artwork area */
 .artwork-section {
-  padding: 24px 24px 12px 24px;
+  padding: 20px 20px 8px 20px;
   position: relative;
 }
 
@@ -202,7 +202,7 @@ body {
 
 /* Song info */
 .song-info {
-  padding: 16px 28px 8px 28px;
+  padding: 10px 24px 6px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -271,9 +271,9 @@ body {
 
 /* Progress bar */
 .progress-section {
-  padding: 0 28px;
-  margin-top: 8px;
-  margin-bottom: 4px;
+  padding: 0 24px;
+  margin-top: 4px;
+  margin-bottom: 2px;
 }
 
 .progress-track {
@@ -323,7 +323,7 @@ body {
 
 /* Controls */
 .controls {
-  padding: 12px 28px;
+  padding: 8px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -395,10 +395,10 @@ body {
 
 /* Volume section styling */
 .volume-section {
-  padding: 10px 28px 20px 28px;
+  padding: 6px 24px 12px 24px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
 .volume-icon {
@@ -432,8 +432,8 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-bottom: 28px;
-  margin-top: 5px;
+  padding-bottom: 20px;
+  margin-top: 2px;
 }
 
 .device-pill {
