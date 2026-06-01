@@ -874,6 +874,13 @@ function App() {
     }
   };
 
+  // Handle focus transition between title and artist inputs to prevent premature auto-close
+  const handleContainerBlur = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setIsEditingText(false);
+    }
+  };
+
   // Sync seekbar and play state
   useEffect(() => {
     const handleTimeUpdate = () => {
@@ -1072,12 +1079,11 @@ function App() {
           <div className="song-info">
             <div className="text-wrapper" id="songTextContainer">
               {isEditingText ? (
-                <div className="edit-metadata-container">
+                <div className="edit-metadata-container" onBlur={handleContainerBlur}>
                   <input 
                     type="text" 
                     value={songTitle} 
                     onChange={(e) => setSongTitle(e.target.value)}
-                    onBlur={() => setIsEditingText(false)}
                     onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
                     autoFocus
                     className="inline-edit-input title-input"
@@ -1086,7 +1092,6 @@ function App() {
                     type="text" 
                     value={songArtist} 
                     onChange={(e) => setSongArtist(e.target.value)}
-                    onBlur={() => setIsEditingText(false)}
                     onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
                     className="inline-edit-input artist-input"
                   />
