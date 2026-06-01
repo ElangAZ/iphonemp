@@ -13,6 +13,7 @@ function App() {
   const [isFavorited, setIsFavorited] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [manualCoverSet, setManualCoverSet] = useState(false);
+  const [isMarquee, setIsMarquee] = useState(false);
 
   const audioRef = useRef(null);
   const videoRef = useRef(null);
@@ -23,11 +24,25 @@ function App() {
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
 
+  const titleRef = useRef(null);
+  const containerRef = useRef(null);
+
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
   const videoSourceRef = useRef(null);
   const audioDestinationRef = useRef(null);
+
+  // Automatically check if title overflows to trigger smooth marquee scrolling
+  useEffect(() => {
+    if (titleRef.current && containerRef.current) {
+      const titleWidth = titleRef.current.scrollWidth;
+      const containerWidth = containerRef.current.clientWidth;
+      setIsMarquee(titleWidth > containerWidth);
+    } else {
+      setIsMarquee(false);
+    }
+  }, [songTitle, isVideo]);
 
   // Sync active player source
   const getActivePlayer = () => {
@@ -817,8 +832,18 @@ function App() {
           {/* Song Info */}
           <div className="song-info">
             <div className="text-wrapper" id="songTextContainer">
-              <div className="title-container">
-                <span className="song-name">{songTitle}</span>
+              <div className="title-container" ref={containerRef}>
+                <span 
+                  className={`song-name ${isMarquee ? 'marquee' : ''}`} 
+                  ref={titleRef}
+                >
+                  {songTitle}
+                </span>
+                {isMarquee && (
+                  <span className="song-name marquee duplicate">
+                    {songTitle}
+                  </span>
+                )}
               </div>
               <div className="song-artist">{songArtist}</div>
             </div>
