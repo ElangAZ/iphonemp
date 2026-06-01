@@ -222,8 +222,22 @@ body {
 }
 
 .title-container.has-marquee {
-  -webkit-mask-image: linear-gradient(to right, black 0%, black 90%, transparent 100%);
-  mask-image: linear-gradient(to right, black 0%, black 90%, transparent 100%);
+  animation: mask-anim 14s linear infinite;
+}
+
+@keyframes mask-anim {
+  0%, 15% {
+    -webkit-mask-image: linear-gradient(to right, black 0%, black 92%, transparent 100%);
+    mask-image: linear-gradient(to right, black 0%, black 92%, transparent 100%);
+  }
+  20%, 80% {
+    -webkit-mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+    mask-image: linear-gradient(to right, transparent 0%, black 8%, black 92%, transparent 100%);
+  }
+  85%, 100% {
+    -webkit-mask-image: linear-gradient(to right, black 0%, black 92%, transparent 100%);
+    mask-image: linear-gradient(to right, black 0%, black 92%, transparent 100%);
+  }
 }
 
 .song-name {
