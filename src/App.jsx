@@ -326,7 +326,7 @@ function App() {
       }
 
       // 4. Song Info text (perfect luxurious spacing)
-      const infoY = artY + artSize + 55;
+      const infoY = artY + artSize + 40;
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 36px Inter';
       ctx.textAlign = 'left';
@@ -397,7 +397,7 @@ function App() {
       ctx.fillText(songArtist, cardX + artPadding, infoY + 42);
 
       // 5. Seekbar
-      const seekY = infoY + 95;
+      const seekY = infoY + 90;
       const seekWidth = cardWidth - (artPadding * 2);
       
       // Track bg
@@ -419,11 +419,11 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '600 20px Inter';
       ctx.textAlign = 'left';
-      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 28);
+      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 38);
       
       ctx.textAlign = 'right';
       const remainingTime = duration > 0 ? (duration - currentTime) : 0;
-      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 28);
+      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 38);
 
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
       const ctrlY = seekY + 70;
