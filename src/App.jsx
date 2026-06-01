@@ -21,9 +21,11 @@ function App() {
   const [conversionStatus, setConversionStatus] = useState('idle'); // 'idle', 'loading_ffmpeg', 'converting', 'success', 'error'
   const [conversionProgress, setConversionProgress] = useState(0);
 
-  // Snippet rendering states
+  // Snippet and format rendering states
   const [renderStart, setRenderStart] = useState('0:00');
-  const [renderDuration, setRenderDuration] = useState('30');
+  const [renderEnd, setRenderEnd] = useState('0:30');
+  const [renderResolution, setRenderResolution] = useState('720'); // '720' or '1080'
+  const [renderFps, setRenderFps] = useState('30'); // '30' or '60'
 
   const audioRef = useRef(null);
   const videoRef = useRef(null);
@@ -40,13 +42,13 @@ function App() {
 
   const isRecordingRef = useRef(isRecording);
   const renderStartRef = useRef(renderStart);
-  const renderDurationRef = useRef(renderDuration);
+  const renderEndRef = useRef(renderEnd);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
     renderStartRef.current = renderStart;
-    renderDurationRef.current = renderDuration;
-  }, [isRecording, renderStart, renderDuration]);
+    renderEndRef.current = renderEnd;
+  }, [isRecording, renderStart, renderEnd]);
 
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
@@ -288,12 +290,12 @@ function App() {
       }
       ctx.restore();
 
-      // 2. Translate and Scale logical coordinate space from 1080x1920 down to 720x1280
-      ctx.save();
-      ctx.scale(1.5, 1.5);
-      
+      // 2. Translate and Scale logical coordinate space based on physical canvasWidth
       const width = 720;
       const height = 1280;
+      const scaleFactor = canvasWidth / width;
+      ctx.save();
+      ctx.scale(scaleFactor, scaleFactor);
 
       // Draw Floating Card Player Card (Centered in 720x1280 logical viewport space)
       const cardWidth = 560;
@@ -708,6 +710,15 @@ function App() {
         coverImgObj.src = artworkUrl;
       }
 
+      // Configure resolution dynamically on the physical canvas object
+      if (renderResolution === '1080') {
+        canvas.width = 1080;
+        canvas.height = 1920;
+      } else {
+        canvas.width = 720;
+        canvas.height = 1280;
+      }
+
       const ctx = canvas.getContext('2d');
       const width = canvas.width;
       const height = canvas.height;
@@ -715,8 +726,8 @@ function App() {
       // Start rendering loop immediately
       startCanvasRenderLoop(ctx, width, height, coverImgObj, isVideo, videoRef.current);
 
-      // Capture video track at 30 fps
-      const canvasStream = canvas.captureStream(30);
+      // Capture video track at dynamic framerate (30 FPS or 60 FPS)
+      const canvasStream = canvas.captureStream(parseInt(renderFps, 10));
       
       // Capture digital audio track from our Web Audio destination node
       let audioTrack = null;
@@ -748,7 +759,11 @@ function App() {
 
       let recorder;
       try {
-        recorder = new MediaRecorder(outputStream, { mimeType });
+        const options = { 
+          mimeType,
+          videoBitsPerSecond: renderResolution === '1080' ? 6000000 : 3500000 // 6 Mbps for 1080p, 3.5 Mbps for 720p
+        };
+        recorder = new MediaRecorder(outputStream, options);
       } catch (e) {
         recorder = new MediaRecorder(outputStream);
         mimeType = recorder.mimeType || 'video/webm';
@@ -864,10 +879,9 @@ function App() {
       const player = getActivePlayer();
       if (player) {
         setCurrentTime(player.currentTime);
-        // Automatically stop rendering once duration limit is met
-        if (isRecordingRef.current && renderDurationRef.current !== 'full') {
-          const startSecs = parseTimeToSeconds(renderStartRef.current);
-          const limitSecs = startSecs + parseFloat(renderDurationRef.current);
+        // Automatically stop rendering once custom end time limit is met
+        if (isRecordingRef.current) {
+          const limitSecs = parseTimeToSeconds(renderEndRef.current);
           if (player.currentTime >= limitSecs) {
             player.pause();
             toggleVideoRecord(); // Complete snippet rendering
@@ -959,16 +973,35 @@ function App() {
               />
             </div>
             <div className="settings-row">
-              <label>Durasi:</label>
+              <label>Sampai:</label>
+              <input 
+                type="text" 
+                value={renderEnd} 
+                onChange={(e) => setRenderEnd(e.target.value)} 
+                placeholder="0:30"
+                className="snippet-input"
+              />
+            </div>
+            <div className="settings-row">
+              <label>Resolusi:</label>
               <select 
-                value={renderDuration} 
-                onChange={(e) => setRenderDuration(e.target.value)}
+                value={renderResolution} 
+                onChange={(e) => setRenderResolution(e.target.value)}
                 className="snippet-select"
               >
-                <option value="15">15 Detik</option>
-                <option value="30">30 Detik</option>
-                <option value="60">60 Detik</option>
-                <option value="full">Penuh</option>
+                <option value="720">720p (HD)</option>
+                <option value="1080">1080p (FHD)</option>
+              </select>
+            </div>
+            <div className="settings-row">
+              <label>FPS:</label>
+              <select 
+                value={renderFps} 
+                onChange={(e) => setRenderFps(e.target.value)}
+                className="snippet-select"
+              >
+                <option value="30">30 FPS</option>
+                <option value="60">60 FPS</option>
               </select>
             </div>
           </div>
