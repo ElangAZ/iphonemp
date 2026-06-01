@@ -347,10 +347,7 @@ function App() {
       ctx.translate(btnCenter - 110, ctrlY);
       ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
-
+      
       // polygon points="19 20 9 12 19 4 19 20"
       ctx.beginPath();
       ctx.moveTo(19 - 12, 20 - 12);
@@ -359,11 +356,13 @@ function App() {
       ctx.closePath();
       ctx.fill();
 
-      // line x1="5" y1="19" x2="5" y2="5"
+      // polygon points="9 20 2 12 9 4 9 20"
       ctx.beginPath();
-      ctx.moveTo(5 - 12, 19 - 12);
-      ctx.lineTo(5 - 12, 5 - 12);
-      ctx.stroke();
+      ctx.moveTo(9 - 12, 20 - 12);
+      ctx.lineTo(2 - 12, 12 - 12);
+      ctx.lineTo(9 - 12, 4 - 12);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
 
       // Large Center Play / Pause Button
@@ -393,9 +392,6 @@ function App() {
       ctx.translate(btnCenter + 110, ctrlY);
       ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
-      ctx.lineWidth = 2;
-      ctx.lineCap = 'round';
 
       // polygon points="5 4 15 12 5 20 5 4"
       ctx.beginPath();
@@ -405,11 +401,13 @@ function App() {
       ctx.closePath();
       ctx.fill();
 
-      // line x1="19" y1="5" x2="19" y2="19"
+      // polygon points="15 4 22 12 15 20 15 4"
       ctx.beginPath();
-      ctx.moveTo(19 - 12, 5 - 12);
-      ctx.lineTo(19 - 12, 19 - 12);
-      ctx.stroke();
+      ctx.moveTo(15 - 12, 4 - 12);
+      ctx.lineTo(22 - 12, 12 - 12);
+      ctx.lineTo(15 - 12, 20 - 12);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
 
       // Favorite Star button (outline if false, solid white if true)
@@ -798,15 +796,15 @@ function App() {
               <button className="ctrl-btn small">
                 <svg viewBox="0 0 24 24">
                   <polygon points="19 20 9 12 19 4 19 20" />
-                  <line x1="5" y1="19" x2="5" y2="5" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" fill="none" />
+                  <polygon points="9 20 2 12 9 4 9 20" />
                 </svg>
               </button>
 
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24">
-                    <rect x="6" y="4" width="4" height="16" rx="1.5" fill="white" />
-                    <rect x="14" y="4" width="4" height="16" rx="1.5" fill="white" />
+                    <rect x="6" y="4" width="4" height="16" rx="1" fill="white" />
+                    <rect x="14" y="4" width="4" height="16" rx="1" fill="white" />
                   </svg>
                 ) : (
                   <svg viewBox="0 0 24 24">
@@ -818,7 +816,7 @@ function App() {
               <button className="ctrl-btn small">
                 <svg viewBox="0 0 24 24">
                   <polygon points="5 4 15 12 5 20 5 4" />
-                  <line x1="19" y1="5" x2="19" y2="19" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" fill="none" />
+                  <polygon points="15 4 22 12 15 20 15 4" />
                 </svg>
               </button>
             </div>
