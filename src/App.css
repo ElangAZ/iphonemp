@@ -234,12 +234,12 @@ body {
 }
 
 .song-name.marquee {
-  animation: marquee 12s linear infinite;
+  animation: marquee 14s linear infinite;
 }
 
 @keyframes marquee {
-  0% { transform: translate3d(0, 0, 0); }
-  100% { transform: translate3d(calc(-100% - 50px), 0, 0); }
+  0%, 15% { transform: translate3d(0, 0, 0); }
+  85%, 100% { transform: translate3d(calc(-100% - 50px), 0, 0); }
 }
 
 .song-artist {
