@@ -271,7 +271,7 @@ function App() {
 
       // Draw Floating Card Player Card (Centered in 720x1280 logical viewport space)
       const cardWidth = 560;
-      const cardHeight = 1050;
+      const cardHeight = 910;
       const cardX = (width - cardWidth) / 2;
       const cardY = (height - cardHeight) / 2;
       const cardRadius = 75;
@@ -325,7 +325,7 @@ function App() {
       }
 
       // 4. Song Info text (perfect luxurious spacing)
-      const infoY = artY + artSize + 55;
+      const infoY = artY + artSize + 38;
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 36px Inter';
       ctx.textAlign = 'left';
@@ -360,7 +360,7 @@ function App() {
       ctx.fillText(songArtist, cardX + artPadding, infoY + 42);
 
       // 5. Seekbar
-      const seekY = infoY + 95;
+      const seekY = infoY + 70;
       const seekWidth = cardWidth - (artPadding * 2);
       
       // Track bg
@@ -382,14 +382,14 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '600 20px Inter';
       ctx.textAlign = 'left';
-      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 35);
+      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 28);
       
       ctx.textAlign = 'right';
       const remainingTime = duration > 0 ? (duration - currentTime) : 0;
-      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 35);
+      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 28);
 
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
-      const ctrlY = seekY + 90;
+      const ctrlY = seekY + 70;
       const btnCenter = cardX + cardWidth / 2;
 
       // Skip Back (<<) - Left
@@ -477,7 +477,7 @@ function App() {
       ctx.restore();
 
       // 7. Volume bar (with scaled up, beautiful speaker icons)
-      const volY = ctrlY + 80;
+      const volY = ctrlY + 65;
       const volX = cardX + artPadding + 48; // Shift slider to give space for larger speakers
       const volWidth = cardWidth - (artPadding * 2) - 96;
       
@@ -541,7 +541,7 @@ function App() {
       ctx.restore();
 
       // 8. Device selector pill button at the bottom center (Perfect tight spacing)
-      const pillY = volY + 70;
+      const pillY = volY + 55;
       const pillWidth = 190;
       const pillHeight = 52;
       const pillX = btnCenter - pillWidth / 2;
