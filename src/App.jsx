@@ -372,10 +372,10 @@ function App() {
       ctx.scale(3.0, 3.0);
       ctx.fillStyle = '#ffffff';
       if (isPlaying) {
-        // Draw rounded Pause bars (x=6.5, y=3, w=3, h=18, rx=1.2)
+        // Draw rounded Pause bars (x=6, y=4, w=4, h=16, rx=1.5)
         ctx.beginPath();
-        ctx.roundRect(6.5 - 12, 3 - 12, 3, 18, 1.2);
-        ctx.roundRect(14.5 - 12, 3 - 12, 3, 18, 1.2);
+        ctx.roundRect(6 - 12, 4 - 12, 4, 16, 1.5);
+        ctx.roundRect(14 - 12, 4 - 12, 4, 16, 1.5);
         ctx.fill();
       } else {
         // Draw large robust Play triangle (7.5, 6.5, 16.5, 12, 7.5, 17.5)
@@ -805,8 +805,8 @@ function App() {
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24">
-                    <rect x="6.5" y="3" width="3" height="18" rx="1.2" fill="white" />
-                    <rect x="14.5" y="3" width="3" height="18" rx="1.2" fill="white" />
+                    <rect x="6" y="4" width="4" height="16" rx="1.5" fill="white" />
+                    <rect x="14" y="4" width="4" height="16" rx="1.5" fill="white" />
                   </svg>
                 ) : (
                   <svg viewBox="0 0 24 24">
