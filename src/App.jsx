@@ -245,6 +245,10 @@ function App() {
     };
 
     const renderFrame = () => {
+      const activePlayer = isVideoActive ? videoEl : audioRef.current;
+      const curT = activePlayer ? activePlayer.currentTime : 0;
+      const dur = activePlayer ? activePlayer.duration : 0;
+
       // 1. Draw heavy blur background using cover art (on physical canvas dimensions)
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
       ctx.save();
@@ -407,7 +411,7 @@ function App() {
       ctx.fill();
 
       // Track filled progress
-      const progressPercent = duration > 0 ? (currentTime / duration) : 0;
+      const progressPercent = dur > 0 ? (curT / dur) : 0;
       const filledWidth = seekWidth * progressPercent;
       
       ctx.beginPath();
@@ -419,10 +423,10 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '600 20px Inter';
       ctx.textAlign = 'left';
-      ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 38);
+      ctx.fillText(formatTime(curT), cardX + artPadding, seekY + 38);
       
       ctx.textAlign = 'right';
-      const remainingTime = duration > 0 ? (duration - currentTime) : 0;
+      const remainingTime = dur > 0 ? (dur - curT) : 0;
       ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 38);
 
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
