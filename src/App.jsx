@@ -213,6 +213,7 @@ function App() {
   // 9:16 Canvas rendering loop and recorder engine
   const startCanvasRenderLoop = (ctx, canvasWidth, canvasHeight, coverImgObj, isVideoActive, videoEl) => {
     let textScrollOffset = 0;
+    let scrollPauseTicks = 0;
     
     // Helper to draw image/video with object-fit: cover cropped-centering
     const drawMediaCover = (media, x, y, w, h, r, isVideoType) => {
@@ -325,7 +326,7 @@ function App() {
       }
 
       // 4. Song Info text (perfect luxurious spacing)
-      const infoY = artY + artSize + 38;
+      const infoY = artY + artSize + 55;
       ctx.fillStyle = '#ffffff';
       ctx.font = '800 36px Inter';
       ctx.textAlign = 'left';
@@ -335,21 +336,57 @@ function App() {
       const titleWidth = ctx.measureText(songTitle).width;
       
       if (titleWidth > maxTextWidth) {
-        ctx.save();
-        // Clip text area to avoid overflowing card edges
-        ctx.beginPath();
-        ctx.rect(cardX + artPadding, infoY - 40, maxTextWidth, 60);
-        ctx.clip();
+        // Create an offscreen canvas for the marquee text masking
+        const offCanvas = document.createElement('canvas');
+        offCanvas.width = maxTextWidth;
+        offCanvas.height = 60;
+        const offCtx = offCanvas.getContext('2d');
+
+        // Draw scrolling text on the offscreen canvas
+        offCtx.fillStyle = '#ffffff';
+        offCtx.font = '800 36px Inter';
+        offCtx.textAlign = 'left';
+        offCtx.textBaseline = 'middle';
         
-        ctx.fillText(songTitle, cardX + artPadding + textScrollOffset, infoY);
-        ctx.fillText(songTitle, cardX + artPadding + textScrollOffset + titleWidth + 100, infoY);
+        // Y coordinate inside offscreen canvas (height is 60, text size is 36, so middle is 30)
+        const textY = 30;
+        offCtx.fillText(songTitle, textScrollOffset, textY);
+        offCtx.fillText(songTitle, textScrollOffset + titleWidth + 100, textY);
+
+        // Apply fade-in/out mask on the offscreen canvas using 'destination-in'
+        offCtx.globalCompositeOperation = 'destination-in';
+        const grad = offCtx.createLinearGradient(0, 0, maxTextWidth, 0);
         
-        // Smooth scrolling title: 0.6px per frame for a natural elegant speed
-        textScrollOffset -= 0.6;
-        if (Math.abs(textScrollOffset) >= titleWidth + 100) {
-          textScrollOffset = 0;
+        // Fade-in appears only when text is moving (i.e. not in the initial/paused phase)
+        if (scrollPauseTicks > 0 || Math.abs(textScrollOffset) < 15) {
+          // Stopped/paused starting phase: only fade out on the right
+          grad.addColorStop(0, 'rgba(0,0,0,1)');
+          grad.addColorStop(0.9, 'rgba(0,0,0,1)');
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
+        } else {
+          // Moving phase: fade in on the left AND fade out on the right
+          grad.addColorStop(0, 'rgba(0,0,0,0)');
+          grad.addColorStop(0.08, 'rgba(0,0,0,1)');
+          grad.addColorStop(0.92, 'rgba(0,0,0,1)');
+          grad.addColorStop(1, 'rgba(0,0,0,0)');
         }
-        ctx.restore();
+
+        offCtx.fillStyle = grad;
+        offCtx.fillRect(0, 0, maxTextWidth, 60);
+
+        // Draw the masked offscreen canvas back to the main canvas
+        ctx.drawImage(offCanvas, cardX + artPadding, infoY - 30);
+
+        // Smooth scrolling title with timed pause matching the CSS keyframes
+        if (scrollPauseTicks > 0) {
+          scrollPauseTicks--;
+        } else {
+          textScrollOffset -= 0.6;
+          if (Math.abs(textScrollOffset) >= titleWidth + 100) {
+            textScrollOffset = 0;
+            scrollPauseTicks = 120; // 2 seconds pause (assuming ~60fps)
+          }
+        }
       } else {
         ctx.fillText(songTitle, cardX + artPadding, infoY);
       }
@@ -360,7 +397,7 @@ function App() {
       ctx.fillText(songArtist, cardX + artPadding, infoY + 42);
 
       // 5. Seekbar
-      const seekY = infoY + 70;
+      const seekY = infoY + 95;
       const seekWidth = cardWidth - (artPadding * 2);
       
       // Track bg
