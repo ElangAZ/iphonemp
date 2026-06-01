@@ -21,6 +21,10 @@ function App() {
   const [conversionStatus, setConversionStatus] = useState('idle'); // 'idle', 'loading_ffmpeg', 'converting', 'success', 'error'
   const [conversionProgress, setConversionProgress] = useState(0);
 
+  // Snippet rendering states
+  const [renderStart, setRenderStart] = useState('0:00');
+  const [renderDuration, setRenderDuration] = useState('30');
+
   const audioRef = useRef(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -33,6 +37,16 @@ function App() {
   const titleRef = useRef(null);
   const containerRef = useRef(null);
   const ffmpegRef = useRef(null);
+
+  const isRecordingRef = useRef(isRecording);
+  const renderStartRef = useRef(renderStart);
+  const renderDurationRef = useRef(renderDuration);
+
+  useEffect(() => {
+    isRecordingRef.current = isRecording;
+    renderStartRef.current = renderStart;
+    renderDurationRef.current = renderDuration;
+  }, [isRecording, renderStart, renderDuration]);
 
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
@@ -642,6 +656,18 @@ function App() {
     renderFrame();
   };
 
+  // Parse mm:ss time into seconds
+  const parseTimeToSeconds = (timeStr) => {
+    if (!timeStr) return 0;
+    if (timeStr.includes(':')) {
+      const parts = timeStr.split(':');
+      const m = parseInt(parts[0], 10) || 0;
+      const s = parseInt(parts[1], 10) || 0;
+      return (m * 60) + s;
+    }
+    return parseFloat(timeStr) || 0;
+  };
+
   // Video recording toggle handler (High definition canvas output with Web Audio context source)
   const toggleVideoRecord = () => {
     if (isRecording) {
@@ -668,6 +694,10 @@ function App() {
       if (!audioContextRef.current) {
         setupWebAudio(player, isVideo);
       }
+
+      // Seek active player directly to snippet starting time
+      const startSecs = parseTimeToSeconds(renderStart);
+      player.currentTime = startSecs;
 
       setIsRecording(true);
       recordedChunksRef.current = [];
@@ -832,7 +862,18 @@ function App() {
   useEffect(() => {
     const handleTimeUpdate = () => {
       const player = getActivePlayer();
-      if (player) setCurrentTime(player.currentTime);
+      if (player) {
+        setCurrentTime(player.currentTime);
+        // Automatically stop rendering once duration limit is met
+        if (isRecordingRef.current && renderDurationRef.current !== 'full') {
+          const startSecs = parseTimeToSeconds(renderStartRef.current);
+          const limitSecs = startSecs + parseFloat(renderDurationRef.current);
+          if (player.currentTime >= limitSecs) {
+            player.pause();
+            toggleVideoRecord(); // Complete snippet rendering
+          }
+        }
+      }
     };
 
     const handleLoadedMetadata = () => {
@@ -884,24 +925,55 @@ function App() {
         style={{ backgroundImage: artworkUrl ? `url(${artworkUrl})` : 'none' }}
       />
 
-      {/* Control Buttons on top right */}
-      <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        Upload Song
-      </button>
+      {/* Control Buttons on top right with snippet settings */}
+      <div className="top-controls-container">
+        <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          Upload Song
+        </button>
 
-      <button 
-        className={`upload-btn record-btn ${isRecording ? 'active' : ''}`}
-        onClick={toggleVideoRecord}
-      >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <circle cx="12" cy="12" r="3" fill={isRecording ? '#fff' : 'none'} />
-        </svg>
-        {isRecording ? 'Stop Render' : 'Render Video'}
-      </button>
+        <button 
+          className={`upload-btn record-btn ${isRecording ? 'active' : ''}`}
+          onClick={toggleVideoRecord}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" />
+            <circle cx="12" cy="12" r="3" fill={isRecording ? '#fff' : 'none'} />
+          </svg>
+          {isRecording ? 'Stop Render' : 'Render Video'}
+        </button>
+
+        {/* Snippet Render Settings Panel */}
+        {!isRecording && (
+          <div className="snippet-settings-panel">
+            <div className="settings-row">
+              <label>Mulai:</label>
+              <input 
+                type="text" 
+                value={renderStart} 
+                onChange={(e) => setRenderStart(e.target.value)} 
+                placeholder="0:00"
+                className="snippet-input"
+              />
+            </div>
+            <div className="settings-row">
+              <label>Durasi:</label>
+              <select 
+                value={renderDuration} 
+                onChange={(e) => setRenderDuration(e.target.value)}
+                className="snippet-select"
+              >
+                <option value="15">15 Detik</option>
+                <option value="30">30 Detik</option>
+                <option value="60">60 Detik</option>
+                <option value="full">Penuh</option>
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Hidden inputs */}
       <input 
