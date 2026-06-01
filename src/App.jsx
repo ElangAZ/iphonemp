@@ -697,20 +697,15 @@ function App() {
         outputStream.addTrack(audioTrack);
       }
 
-      // Initialize MediaRecorder - detect best supported mimeType and extension
-      let mimeType = 'video/webm';
+      // Initialize MediaRecorder - high quality WebM render as base format
+      let mimeType = 'video/webm;codecs=vp9,opus';
       let fileExt = 'webm';
 
       if (typeof MediaRecorder.isTypeSupported === 'function') {
-        if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264,aac')) {
-          mimeType = 'video/mp4;codecs=h264,aac';
-          fileExt = 'mp4';
-        } else if (MediaRecorder.isTypeSupported('video/mp4')) {
-          mimeType = 'video/mp4';
-          fileExt = 'mp4';
-        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
-          mimeType = 'video/webm;codecs=h264';
-          fileExt = 'webm';
+        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
+          mimeType = 'video/webm;codecs=vp9,opus';
+        } else if (MediaRecorder.isTypeSupported('video/webm')) {
+          mimeType = 'video/webm';
         }
       }
 
@@ -718,10 +713,8 @@ function App() {
       try {
         recorder = new MediaRecorder(outputStream, { mimeType });
       } catch (e) {
-        console.warn("Target mimeType not supported, trying default mimeType");
         recorder = new MediaRecorder(outputStream);
         mimeType = recorder.mimeType || 'video/webm';
-        fileExt = mimeType.includes('mp4') ? 'mp4' : 'webm';
       }
 
       recorder.ondataavailable = (event) => {
