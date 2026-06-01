@@ -353,8 +353,8 @@ body {
 }
 
 .control-center .ctrl-btn.small svg polygon {
-  fill: white;
-  stroke: white;
+  fill: rgba(255, 255, 255, 0.7);
+  stroke: rgba(255, 255, 255, 0.7);
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
