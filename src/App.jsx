@@ -1215,12 +1215,28 @@ function App() {
               <div className="option-box">
                 <div className="option-info">
                   <h4>Format MP4 (Untuk Galeri HP)</h4>
-                  <p>Mengonversi WebM ke MP4 agar bisa disimpan langsung di galeri handphone Anda offline.</p>
+                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? (
+                    <div className="mobile-warning-box">
+                      <p className="warning-text">⚠️ <strong>Peringatan HP/Mobile:</strong></p>
+                      <p className="warning-desc">Proses konversi MP4 di browser HP membutuhkan RAM sangat besar dan **sering membuat browser HP crash/menutup sendiri**.</p>
+                      <p className="recommend-text">💡 <strong>Sangat Disarankan:</strong> Unduh format <strong>WebM (Instan)</strong> di atas, lalu kirim ke WhatsApp atau upload ke IG/TikTok. Sosmed akan mengubahnya ke MP4 secara otomatis!</p>
+                    </div>
+                  ) : (
+                    <p>Mengonversi WebM ke MP4 agar bisa disimpan langsung di galeri handphone Anda offline.</p>
+                  )}
                 </div>
 
                 {conversionStatus === 'idle' && (
                   <button className="option-btn mp4-btn" onClick={handleConvertToMp4}>
-                    <i className="fas fa-sync-alt"></i> Konversi ke MP4
+                    {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? (
+                      <>
+                        <i className="fas fa-exclamation-triangle"></i> Tetap Paksa Konversi MP4
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-sync-alt"></i> Konversi ke MP4
+                      </>
+                    )}
                   </button>
                 )}
 
