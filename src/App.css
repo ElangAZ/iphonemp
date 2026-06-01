@@ -99,7 +99,8 @@ body {
 }
 
 .player {
-  width: 390px;
+  width: 90vw;
+  max-width: 390px;
   height: auto;
   background: rgba(15, 15, 15, 0.45);
   backdrop-filter: blur(50px);
@@ -479,7 +480,8 @@ body {
 }
 
 .transcode-modal-card {
-  width: 480px;
+  width: 90%;
+  max-width: 480px;
   background: rgba(25, 25, 25, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 28px;
@@ -829,4 +831,31 @@ body {
   font-size: 14px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
+}
+
+/* Responsive mobile viewports */
+@media (max-width: 768px) {
+  /* Position top controls at the top center using standard relative placement so they don't block the card */
+  .top-controls-container {
+    position: relative !important;
+    top: 0 !important;
+    right: 0 !important;
+    margin: 20px auto 10px auto !important;
+    align-items: center !important;
+    width: 100% !important;
+  }
+  
+  .snippet-settings-panel {
+    width: 90% !important;
+    max-width: 320px !important;
+    align-items: center !important;
+  }
+
+  .settings-row {
+    width: 100% !important;
+  }
+
+  .player-wrap {
+    padding: 10px 0 !important;
+  }
 }
