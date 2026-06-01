@@ -658,7 +658,7 @@ function App() {
       />
 
       {/* Control Buttons on top right */}
-      <button className="upload-btn record-btn" onClick={() => fileInputRef.current.click()}>
+      <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M12 5v14M5 12h14" />
         </svg>
@@ -668,7 +668,6 @@ function App() {
       <button 
         className={`upload-btn record-btn ${isRecording ? 'active' : ''}`}
         onClick={toggleVideoRecord}
-        style={{ right: '175px' }}
       >
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <circle cx="12" cy="12" r="10" />
