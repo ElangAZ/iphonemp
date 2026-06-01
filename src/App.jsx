@@ -697,14 +697,31 @@ function App() {
         outputStream.addTrack(audioTrack);
       }
 
-      // Initialize MediaRecorder
-      const options = { mimeType: 'video/webm;codecs=vp9,opus' };
+      // Initialize MediaRecorder - detect best supported mimeType and extension
+      let mimeType = 'video/webm;codecs=vp9,opus';
+      let fileExt = 'webm';
+
+      if (typeof MediaRecorder.isTypeSupported === 'function') {
+        if (MediaRecorder.isTypeSupported('video/mp4;codecs=h264,aac')) {
+          mimeType = 'video/mp4;codecs=h264,aac';
+          fileExt = 'mp4';
+        } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+          mimeType = 'video/mp4';
+          fileExt = 'mp4';
+        } else if (MediaRecorder.isTypeSupported('video/webm;codecs=h264')) {
+          mimeType = 'video/webm;codecs=h264';
+          fileExt = 'webm';
+        }
+      }
+
       let recorder;
       try {
-        recorder = new MediaRecorder(outputStream, options);
+        recorder = new MediaRecorder(outputStream, { mimeType });
       } catch (e) {
-        console.warn("VP9/Opus codec not supported, trying default mimeType");
+        console.warn("Target mimeType not supported, trying default mimeType");
         recorder = new MediaRecorder(outputStream);
+        mimeType = recorder.mimeType || 'video/webm';
+        fileExt = mimeType.includes('mp4') ? 'mp4' : 'webm';
       }
 
       recorder.ondataavailable = (event) => {
@@ -714,13 +731,13 @@ function App() {
       };
 
       recorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
         const videoDownloadUrl = URL.createObjectURL(blob);
         
         // Trigger high-quality video download
         const a = document.createElement('a');
         a.href = videoDownloadUrl;
-        a.download = `${songTitle || 'senux_player'}_render.webm`;
+        a.download = `${songTitle || 'senux_player'}_render.${fileExt}`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
