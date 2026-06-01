@@ -343,19 +343,23 @@ function App() {
       ctx.translate(btnCenter - 110, ctrlY);
       ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+
+      // polygon points="19 20 9 12 19 4 19 20"
       ctx.beginPath();
-      ctx.moveTo(10 - 12, 3 - 12);
-      ctx.lineTo(2 - 12, 12 - 12);
-      ctx.lineTo(10 - 12, 21 - 12);
+      ctx.moveTo(19 - 12, 20 - 12);
+      ctx.lineTo(9 - 12, 12 - 12);
+      ctx.lineTo(19 - 12, 4 - 12);
       ctx.closePath();
       ctx.fill();
 
+      // line x1="5" y1="19" x2="5" y2="5"
       ctx.beginPath();
-      ctx.moveTo(20 - 12, 3 - 12);
-      ctx.lineTo(12 - 12, 12 - 12);
-      ctx.lineTo(20 - 12, 21 - 12);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(5 - 12, 19 - 12);
+      ctx.lineTo(5 - 12, 5 - 12);
+      ctx.stroke();
       ctx.restore();
 
       // Large Center Play / Pause Button
@@ -385,19 +389,23 @@ function App() {
       ctx.translate(btnCenter + 110, ctrlY);
       ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
+      ctx.lineWidth = 2;
+      ctx.lineCap = 'round';
+
+      // polygon points="5 4 15 12 5 20 5 4"
       ctx.beginPath();
-      ctx.moveTo(6 - 12, 3 - 12);
-      ctx.lineTo(20 - 12, 12 - 12);
-      ctx.lineTo(6 - 12, 21 - 12);
+      ctx.moveTo(5 - 12, 4 - 12);
+      ctx.lineTo(15 - 12, 12 - 12);
+      ctx.lineTo(5 - 12, 20 - 12);
       ctx.closePath();
       ctx.fill();
 
+      // line x1="19" y1="5" x2="19" y2="19"
       ctx.beginPath();
-      ctx.moveTo(14 - 12, 3 - 12);
-      ctx.lineTo(22 - 12, 12 - 12);
-      ctx.lineTo(14 - 12, 21 - 12);
-      ctx.closePath();
-      ctx.fill();
+      ctx.moveTo(19 - 12, 5 - 12);
+      ctx.lineTo(19 - 12, 19 - 12);
+      ctx.stroke();
       ctx.restore();
 
       // Favorite Star button (outline if false, solid white if true)
@@ -785,8 +793,8 @@ function App() {
             <div className="control-center">
               <button className="ctrl-btn small">
                 <svg viewBox="0 0 24 24">
-                  <polygon points="10,3 2,12 10,21" />
-                  <polygon points="20,3 12,12 20,21" />
+                  <polygon points="19 20 9 12 19 4 19 20" />
+                  <line x1="5" y1="19" x2="5" y2="5" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" fill="none" />
                 </svg>
               </button>
 
@@ -805,8 +813,8 @@ function App() {
 
               <button className="ctrl-btn small">
                 <svg viewBox="0 0 24 24">
-                  <polygon points="6,3 20,12 6,21" />
-                  <polygon points="14,3 22,12 14,21" />
+                  <polygon points="5 4 15 12 5 20 5 4" />
+                  <line x1="19" y1="5" x2="19" y2="19" stroke="rgba(255,255,255,0.85)" strokeWidth="2" strokeLinecap="round" fill="none" />
                 </svg>
               </button>
             </div>
