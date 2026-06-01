@@ -15,6 +15,12 @@ function App() {
   const [manualCoverSet, setManualCoverSet] = useState(false);
   const [isMarquee, setIsMarquee] = useState(false);
 
+  // FFmpeg transcode states
+  const [showModal, setShowModal] = useState(false);
+  const [webmBlob, setWebmBlob] = useState(null);
+  const [conversionStatus, setConversionStatus] = useState('idle'); // 'idle', 'loading_ffmpeg', 'converting', 'success', 'error'
+  const [conversionProgress, setConversionProgress] = useState(0);
+
   const audioRef = useRef(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -26,6 +32,7 @@ function App() {
 
   const titleRef = useRef(null);
   const containerRef = useRef(null);
+  const ffmpegRef = useRef(null);
 
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
@@ -725,15 +732,10 @@ function App() {
 
       recorder.onstop = () => {
         const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-        const videoDownloadUrl = URL.createObjectURL(blob);
-        
-        // Trigger high-quality video download
-        const a = document.createElement('a');
-        a.href = videoDownloadUrl;
-        a.download = `${songTitle || 'senux_player'}_render.${fileExt}`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        setWebmBlob(blob);
+        setShowModal(true);
+        setConversionStatus('idle');
+        setConversionProgress(0);
       };
 
       mediaRecorderRef.current = recorder;
@@ -743,6 +745,86 @@ function App() {
       if (player.paused) {
         player.play().then(() => setIsPlaying(true));
       }
+    }
+  };
+
+  // Handle direct WebM file download
+  const handleDownloadWebm = () => {
+    if (!webmBlob) return;
+    const url = URL.createObjectURL(webmBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${songTitle || 'senux_player'}_render.webm`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  // Convert WebM to MP4 using single-threaded FFmpeg.wasm in browser
+  const handleConvertToMp4 = async () => {
+    if (!webmBlob) return;
+    
+    try {
+      setConversionStatus('loading_ffmpeg');
+      setConversionProgress(0);
+
+      // Load FFmpeg from window object (loaded via index.html script tag)
+      if (!ffmpegRef.current) {
+        if (!window.FFmpeg) {
+          throw new Error("FFmpeg library not loaded from CDN.");
+        }
+        const { createFFmpeg } = window.FFmpeg;
+        ffmpegRef.current = createFFmpeg({
+          log: true,
+          corePath: 'https://unpkg.com/@ffmpeg/core-st@0.11.1/dist/ffmpeg-core.js'
+        });
+      }
+
+      const ffmpeg = ffmpegRef.current;
+      if (!ffmpeg.isLoaded()) {
+        await ffmpeg.load();
+      }
+
+      // Track progress
+      ffmpeg.setProgress(({ ratio }) => {
+        setConversionProgress(Math.min(99, Math.round(ratio * 100)));
+      });
+
+      setConversionStatus('converting');
+
+      // Write the file into FFmpeg's virtual file system
+      const arrayBuffer = await webmBlob.arrayBuffer();
+      ffmpeg.FS('writeFile', 'input.webm', new Uint8Array(arrayBuffer));
+
+      // Execute conversion: transcode audio to AAC, copy video track (ultra-fast container swapping)
+      await ffmpeg.run('-i', 'input.webm', '-c:v', 'copy', '-c:a', 'aac', 'output.mp4');
+
+      // Read output
+      const data = ffmpeg.FS('readFile', 'output.mp4');
+      const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
+      const mp4Url = URL.createObjectURL(mp4Blob);
+
+      // Trigger MP4 download
+      const a = document.createElement('a');
+      a.href = mp4Url;
+      a.download = `${songTitle || 'senux_player'}_render.mp4`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      setConversionProgress(100);
+      setConversionStatus('success');
+      
+      // Clean up files in virtual FS to free up browser memory
+      try {
+        ffmpeg.FS('unlink', 'input.webm');
+        ffmpeg.FS('unlink', 'output.mp4');
+      } catch (err) {
+        console.warn("Clean up virtual files warning:", err);
+      }
+    } catch (error) {
+      console.error("FFmpeg conversion error:", error);
+      setConversionStatus('error');
     }
   };
 
@@ -969,6 +1051,84 @@ function App() {
 
       {/* DOM placeholders to prevent background visualizer scripts (if any) from throwing TypeErrors */}
       <div className="visualizer" style={{ display: 'none' }} />
+
+      {/* Premium Transcode Modal Overlay */}
+      {showModal && (
+        <div className="transcode-modal-overlay">
+          <div className="transcode-modal-card">
+            <button className="close-modal-btn" onClick={() => setShowModal(false)}>×</button>
+            
+            <div className="transcode-header">
+              <span className="success-icon">🎉</span>
+              <h3>Video Berhasil Dirender!</h3>
+              <p>Pilih format unduhan video yang Anda inginkan:</p>
+            </div>
+
+            <div className="conversion-options">
+              {/* Option 1: Direct WebM */}
+              <div className="option-box">
+                <div className="option-info">
+                  <h4>Format WebM (Instan)</h4>
+                  <p>Sangat cepat tanpa loading, langsung siap di-upload ke WhatsApp, TikTok, Instagram, atau YouTube!</p>
+                </div>
+                <button className="option-btn webm-btn" onClick={handleDownloadWebm}>
+                  <i className="fas fa-bolt"></i> Unduh WebM
+                </button>
+              </div>
+
+              {/* Option 2: Transcode to MP4 */}
+              <div className="option-box">
+                <div className="option-info">
+                  <h4>Format MP4 (Untuk Galeri HP)</h4>
+                  <p>Mengonversi WebM ke MP4 agar bisa disimpan langsung di galeri handphone Anda offline.</p>
+                </div>
+
+                {conversionStatus === 'idle' && (
+                  <button className="option-btn mp4-btn" onClick={handleConvertToMp4}>
+                    <i className="fas fa-sync-alt"></i> Konversi ke MP4
+                  </button>
+                )}
+
+                {conversionStatus === 'loading_ffmpeg' && (
+                  <div className="conversion-status-loading">
+                    <div className="spinner"></div>
+                    <span>Menyiapkan Engine Konverter...</span>
+                  </div>
+                )}
+
+                {conversionStatus === 'converting' && (
+                  <div className="conversion-status-progress">
+                    <div className="progress-bar-container">
+                      <div className="progress-bar-fill" style={{ width: `${conversionProgress}%` }}></div>
+                    </div>
+                    <span>Mengonversi ke MP4: {conversionProgress}%</span>
+                  </div>
+                )}
+
+                {conversionStatus === 'success' && (
+                  <div className="conversion-status-success">
+                    <i className="fas fa-check-circle"></i>
+                    <span>Konversi Berhasil! MP4 telah diunduh.</span>
+                    <button className="option-btn mp4-btn reset-btn" onClick={() => setConversionStatus('idle')}>
+                      Konversi Ulang
+                    </button>
+                  </div>
+                )}
+
+                {conversionStatus === 'error' && (
+                  <div className="conversion-status-error">
+                    <i className="fas fa-exclamation-circle"></i>
+                    <span>Konversi gagal. Coba format WebM (Instan).</span>
+                    <button className="option-btn mp4-btn reset-btn" onClick={handleConvertToMp4}>
+                      Coba Lagi
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <audio ref={audioRef} style={{ display: 'none' }} />
     </>
