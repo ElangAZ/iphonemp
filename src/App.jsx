@@ -307,7 +307,7 @@ function App() {
       const artSize = cardWidth - (artPadding * 2);
       const artX = cardX + artPadding;
       const artY = cardY + artPadding;
-      const artRadius = 45;
+      const artRadius = 20;
 
       if (isVideoActive && videoEl && !videoEl.paused) {
         drawMediaCover(videoEl, artX, artY, artSize, artSize, artRadius, true);
