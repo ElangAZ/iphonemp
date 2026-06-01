@@ -339,57 +339,66 @@ function App() {
       const btnCenter = cardX + cardWidth / 2;
 
       // Skip Back (<<) - Left
+      ctx.save();
+      ctx.translate(btnCenter - 110, ctrlY);
+      ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.moveTo(btnCenter - 100, ctrlY);
-      ctx.lineTo(btnCenter - 75, ctrlY - 20);
-      ctx.lineTo(btnCenter - 75, ctrlY + 20);
+      ctx.moveTo(10 - 12, 3 - 12);
+      ctx.lineTo(2 - 12, 12 - 12);
+      ctx.lineTo(10 - 12, 21 - 12);
       ctx.closePath();
       ctx.fill();
 
       ctx.beginPath();
-      ctx.moveTo(btnCenter - 75, ctrlY);
-      ctx.lineTo(btnCenter - 50, ctrlY - 20);
-      ctx.lineTo(btnCenter - 50, ctrlY + 20);
+      ctx.moveTo(20 - 12, 3 - 12);
+      ctx.lineTo(12 - 12, 12 - 12);
+      ctx.lineTo(20 - 12, 21 - 12);
       ctx.closePath();
       ctx.fill();
+      ctx.restore();
 
       // Large Center Play / Pause Button
       ctx.save();
       ctx.translate(btnCenter, ctrlY);
+      ctx.scale(3.0, 3.0);
+      ctx.fillStyle = '#ffffff';
       if (isPlaying) {
-        // Draw Pause bars
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(-22, -30, 14, 60);
-        ctx.fillRect(8, -30, 14, 60);
-      } else {
-        // Draw large robust Play triangle (borderless)
+        // Draw rounded Pause bars (x=4, y=2, w=5, h=20, rx=2)
         ctx.beginPath();
-        // Exact coordinate translation of play-btn svg path/polygon
-        ctx.moveTo(-15, -30);
-        ctx.lineTo(25, 0);
-        ctx.lineTo(-15, 30);
+        ctx.roundRect(4 - 12, 2 - 12, 5, 20, 2);
+        ctx.roundRect(15 - 12, 2 - 12, 5, 20, 2);
+        ctx.fill();
+      } else {
+        // Draw large robust Play triangle (7.5, 6.5, 16.5, 12, 7.5, 17.5)
+        ctx.beginPath();
+        ctx.moveTo(7.5 - 12, 6.5 - 12);
+        ctx.lineTo(16.5 - 12, 12 - 12);
+        ctx.lineTo(7.5 - 12, 17.5 - 12);
         ctx.closePath();
-        ctx.fillStyle = '#ffffff';
         ctx.fill();
       }
       ctx.restore();
 
       // Skip Forward (>>) - Right
+      ctx.save();
+      ctx.translate(btnCenter + 110, ctrlY);
+      ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.moveTo(btnCenter + 50, ctrlY);
-      ctx.lineTo(btnCenter + 75, ctrlY - 20);
-      ctx.lineTo(btnCenter + 75, ctrlY + 20);
+      ctx.moveTo(6 - 12, 3 - 12);
+      ctx.lineTo(20 - 12, 12 - 12);
+      ctx.lineTo(6 - 12, 21 - 12);
       ctx.closePath();
       ctx.fill();
 
       ctx.beginPath();
-      ctx.moveTo(btnCenter + 75, ctrlY);
-      ctx.lineTo(btnCenter + 100, ctrlY - 20);
-      ctx.lineTo(btnCenter + 100, ctrlY + 20);
+      ctx.moveTo(14 - 12, 3 - 12);
+      ctx.lineTo(22 - 12, 12 - 12);
+      ctx.lineTo(14 - 12, 21 - 12);
       ctx.closePath();
       ctx.fill();
+      ctx.restore();
 
       // Favorite Star button (outline if false, solid white if true)
       ctx.save();
@@ -776,28 +785,28 @@ function App() {
             <div className="control-center">
               <button className="ctrl-btn small">
                 <svg viewBox="0 0 24 24">
-                  <polygon points="19 20 9 12 19 4 19 20" />
-                  <polygon points="9 20 2 12 9 4 9 20" />
+                  <polygon points="10,3 2,12 10,21" />
+                  <polygon points="20,3 12,12 20,21" />
                 </svg>
               </button>
 
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24">
-                    <rect x="5" y="4" width="4" height="16" />
-                    <rect x="15" y="4" width="4" height="16" />
+                    <rect x="4" y="2" width="5" height="20" rx="2" fill="white" />
+                    <rect x="15" y="2" width="5" height="20" rx="2" fill="white" />
                   </svg>
                 ) : (
                   <svg viewBox="0 0 24 24">
-                    <polygon points="7.5 5 18.5 12 7.5 19 7.5 5" />
+                    <polygon points="7.5 6.5 16.5 12 7.5 17.5 7.5 6.5" />
                   </svg>
                 )}
               </button>
 
               <button className="ctrl-btn small">
                 <svg viewBox="0 0 24 24">
-                  <polygon points="5 4 15 12 5 20 5 4" />
-                  <polygon points="15 4 22 12 15 20 15 4" />
+                  <polygon points="6,3 20,12 6,21" />
+                  <polygon points="14,3 22,12 14,21" />
                 </svg>
               </button>
             </div>
