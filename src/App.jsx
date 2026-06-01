@@ -698,7 +698,7 @@ function App() {
       }
 
       // Initialize MediaRecorder - detect best supported mimeType and extension
-      let mimeType = 'video/webm;codecs=vp9,opus';
+      let mimeType = 'video/webm';
       let fileExt = 'webm';
 
       if (typeof MediaRecorder.isTypeSupported === 'function') {
