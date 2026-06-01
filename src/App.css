@@ -324,56 +324,28 @@ body {
 
 .ctrl-btn:active { transform: scale(0.88); }
 
-.ctrl-btn.small svg { width: 34px; height: 34px; fill: #ffffff; }
+.ctrl-btn.small {
+  font-size: 26px;
+  color: #ffffff;
+}
 
 .play-btn {
+  font-size: 30px;
   width: 75px;
   height: 75px;
-  background: none;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: #ffffff;
 }
 
 .play-btn:active { transform: scale(0.9); }
 
-.play-btn svg { width: 62px; height: 62px; }
-.play-btn svg polygon,
-.play-btn svg path {
-  fill: white;
-  stroke: white;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.play-btn svg rect {
-  fill: white;
-  stroke: none;
+#starBtn i {
+  color: #8c8c8e;
+  font-size: 24px;
+  transition: color 0.2s ease;
 }
 
-.control-center .ctrl-btn.small svg polygon {
-  fill: white;
-  stroke: white;
-  stroke-width: 1.5;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.ctrl-btn.small#starBtn svg {
-  fill: none;
-  stroke: rgba(255,255,255,0.7);
-  stroke-width: 2.2;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  width: 26px;
-  height: 26px;
-  transition: all 0.2s ease;
-}
-
-.ctrl-btn.small#starBtn.favorited svg {
-  fill: #ffffff;
-  stroke: #ffffff;
+#starBtn.favorited i {
+  color: #ffffff !important;
 }
 
 /* Volume */

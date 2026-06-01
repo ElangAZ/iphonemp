@@ -786,38 +786,21 @@ function App() {
               id="starBtn" 
               onClick={toggleFavorite}
             >
-              <svg viewBox="0 0 24 24" fill="none">
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
+              <i className={isFavorited ? "fas fa-star" : "far fa-star"}></i>
             </button>
 
             {/* Middle Playback buttons */}
             <div className="control-center">
               <button className="ctrl-btn small">
-                <svg viewBox="0 0 24 24">
-                  <polygon points="19 20 9 12 19 4 19 20" />
-                  <polygon points="9 20 2 12 9 4 9 20" />
-                </svg>
+                <i className="fas fa-backward"></i>
               </button>
 
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
-                {isPlaying ? (
-                  <svg viewBox="0 0 24 24">
-                    <rect x="6" y="4" width="4" height="16" rx="1" fill="white" />
-                    <rect x="14" y="4" width="4" height="16" rx="1" fill="white" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24">
-                    <polygon points="7.5 6.5 16.5 12 7.5 17.5 7.5 6.5" />
-                  </svg>
-                )}
+                <i className={isPlaying ? "fas fa-pause" : "fas fa-play"}></i>
               </button>
 
               <button className="ctrl-btn small">
-                <svg viewBox="0 0 24 24">
-                  <polygon points="5 4 15 12 5 20 5 4" />
-                  <polygon points="15 4 22 12 15 20 15 4" />
-                </svg>
+                <i className="fas fa-forward"></i>
               </button>
             </div>
           </div>
