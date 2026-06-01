@@ -330,13 +330,30 @@ body {
 }
 
 .play-btn {
-  font-size: 30px;
   width: 75px;
   height: 75px;
-  color: #ffffff;
+  background: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .play-btn:active { transform: scale(0.9); }
+
+.play-btn svg { width: 62px; height: 62px; }
+.play-btn svg polygon,
+.play-btn svg path {
+  fill: white;
+  stroke: white;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.play-btn svg rect {
+  fill: white;
+  stroke: none;
+}
 
 #starBtn i {
   color: #8c8c8e;

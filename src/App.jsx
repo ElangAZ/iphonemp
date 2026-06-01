@@ -796,7 +796,16 @@ function App() {
               </button>
 
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
-                <i className={isPlaying ? "fas fa-pause" : "fas fa-play"}></i>
+                {isPlaying ? (
+                  <svg viewBox="0 0 24 24">
+                    <rect x="6" y="4" width="4" height="16" rx="1.2" fill="white" />
+                    <rect x="14" y="4" width="4" height="16" rx="1.2" fill="white" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24">
+                    <polygon points="7.5 6.5 16.5 12 7.5 17.5 7.5 6.5" />
+                  </svg>
+                )}
               </button>
 
               <button className="ctrl-btn small">
