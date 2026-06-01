@@ -793,3 +793,40 @@ body {
   background: #111;
   color: #fff;
 }
+
+/* Inline Metadata Editor Styling */
+.edit-metadata-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+}
+
+.inline-edit-input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  color: #ffffff;
+  outline: none;
+  font-family: 'Inter', sans-serif;
+  transition: all 0.2s ease;
+  padding: 4px 10px;
+}
+
+.inline-edit-input:focus {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: #ffffff;
+}
+
+.inline-edit-input.title-input {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+}
+
+.inline-edit-input.artist-input {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.85);
+}

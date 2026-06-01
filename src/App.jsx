@@ -6,8 +6,9 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.7);
-  const [songTitle, setSongTitle] = useState('daisy');
-  const [songArtist, setSongArtist] = useState('[free] k-pop x r&b x ballad type beat');
+  const [songTitle, setSongTitle] = useState('Song name');
+  const [songArtist, setSongArtist] = useState('Artist');
+  const [isEditingText, setIsEditingText] = useState(false);
   const [artworkUrl, setArtworkUrl] = useState('');
   const [isVideo, setIsVideo] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
@@ -1070,20 +1071,44 @@ function App() {
           {/* Song Info */}
           <div className="song-info">
             <div className="text-wrapper" id="songTextContainer">
-              <div className={`title-container ${isMarquee ? 'has-marquee' : ''}`} ref={containerRef}>
-                <span 
-                  className={`song-name ${isMarquee ? 'marquee' : ''}`} 
-                  ref={titleRef}
-                >
-                  {songTitle}
-                </span>
-                {isMarquee && (
-                  <span className="song-name marquee duplicate">
-                    {songTitle}
-                  </span>
-                )}
-              </div>
-              <div className="song-artist">{songArtist}</div>
+              {isEditingText ? (
+                <div className="edit-metadata-container">
+                  <input 
+                    type="text" 
+                    value={songTitle} 
+                    onChange={(e) => setSongTitle(e.target.value)}
+                    onBlur={() => setIsEditingText(false)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
+                    autoFocus
+                    className="inline-edit-input title-input"
+                  />
+                  <input 
+                    type="text" 
+                    value={songArtist} 
+                    onChange={(e) => setSongArtist(e.target.value)}
+                    onBlur={() => setIsEditingText(false)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
+                    className="inline-edit-input artist-input"
+                  />
+                </div>
+              ) : (
+                <div onClick={() => setIsEditingText(true)} style={{ cursor: 'pointer' }} title="Klik untuk edit nama & artis">
+                  <div className={`title-container ${isMarquee ? 'has-marquee' : ''}`} ref={containerRef}>
+                    <span 
+                      className={`song-name ${isMarquee ? 'marquee' : ''}`} 
+                      ref={titleRef}
+                    >
+                      {songTitle}
+                    </span>
+                    {isMarquee && (
+                      <span className="song-name marquee duplicate">
+                        {songTitle}
+                      </span>
+                    )}
+                  </div>
+                  <div className="song-artist">{songArtist}</div>
+                </div>
+              )}
             </div>
           </div>
 
