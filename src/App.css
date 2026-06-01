@@ -835,6 +835,15 @@ body {
 
 /* Responsive mobile viewports */
 @media (max-width: 768px) {
+  body {
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    padding: 20px 0 !important;
+  }
+
   /* Position top controls at the top center using standard relative placement so they don't block the card */
   .top-controls-container {
     position: relative !important;
