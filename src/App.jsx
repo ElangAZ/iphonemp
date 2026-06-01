@@ -832,7 +832,7 @@ function App() {
           {/* Song Info */}
           <div className="song-info">
             <div className="text-wrapper" id="songTextContainer">
-              <div className="title-container" ref={containerRef}>
+              <div className={`title-container ${isMarquee ? 'has-marquee' : ''}`} ref={containerRef}>
                 <span 
                   className={`song-name ${isMarquee ? 'marquee' : ''}`} 
                   ref={titleRef}
