@@ -340,13 +340,16 @@ body {
 
 .play-btn svg { width: 62px; height: 62px; }
 .play-btn svg polygon,
-.play-btn svg path,
-.play-btn svg rect {
+.play-btn svg path {
   fill: white;
   stroke: white;
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+.play-btn svg rect {
+  fill: white;
+  stroke: none;
 }
 
 .ctrl-btn.small#starBtn svg {

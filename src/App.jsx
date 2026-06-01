@@ -26,6 +26,7 @@ function App() {
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
+  const videoSourceRef = useRef(null);
   const audioDestinationRef = useRef(null);
 
   // Sync active player source
@@ -34,7 +35,7 @@ function App() {
   };
 
   // Setup Web Audio API for clean recording stream
-  const setupWebAudio = (element) => {
+  const setupWebAudio = (element, isVideoType) => {
     if (!audioContextRef.current) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       audioContextRef.current = new AudioContextClass();
@@ -44,20 +45,23 @@ function App() {
       ctx.resume();
     }
 
-    if (audioSourceRef.current) {
-      try {
-        audioSourceRef.current.disconnect();
-      } catch (e) {
-        console.warn(e);
+    if (isVideoType) {
+      if (videoSourceRef.current) return; // Already connected!
+      videoSourceRef.current = ctx.createMediaElementSource(element);
+      videoSourceRef.current.connect(ctx.destination);
+      if (!audioDestinationRef.current) {
+        audioDestinationRef.current = ctx.createMediaStreamDestination();
       }
+      videoSourceRef.current.connect(audioDestinationRef.current);
+    } else {
+      if (audioSourceRef.current) return; // Already connected!
+      audioSourceRef.current = ctx.createMediaElementSource(element);
+      audioSourceRef.current.connect(ctx.destination);
+      if (!audioDestinationRef.current) {
+        audioDestinationRef.current = ctx.createMediaStreamDestination();
+      }
+      audioSourceRef.current.connect(audioDestinationRef.current);
     }
-
-    audioSourceRef.current = ctx.createMediaElementSource(element);
-    audioDestinationRef.current = ctx.createMediaStreamDestination();
-
-    // Connect to system output (speaker) AND recording destination
-    audioSourceRef.current.connect(ctx.destination);
-    audioSourceRef.current.connect(audioDestinationRef.current);
   };
 
   // Play/Pause Toggle
@@ -138,7 +142,7 @@ function App() {
       if (player) {
         player.src = url;
         player.load();
-        setupWebAudio(player);
+        setupWebAudio(player, fileIsVideo);
         player.volume = volume;
       }
     }, 50);
@@ -368,10 +372,10 @@ function App() {
       ctx.scale(3.0, 3.0);
       ctx.fillStyle = '#ffffff';
       if (isPlaying) {
-        // Draw rounded Pause bars (x=6, y=3, w=4, h=18, rx=2)
+        // Draw rounded Pause bars (x=6.5, y=3, w=3, h=18, rx=1.2)
         ctx.beginPath();
-        ctx.roundRect(6 - 12, 3 - 12, 4, 18, 2);
-        ctx.roundRect(14 - 12, 3 - 12, 4, 18, 2);
+        ctx.roundRect(6.5 - 12, 3 - 12, 3, 18, 1.2);
+        ctx.roundRect(14.5 - 12, 3 - 12, 3, 18, 1.2);
         ctx.fill();
       } else {
         // Draw large robust Play triangle (7.5, 6.5, 16.5, 12, 7.5, 17.5)
@@ -541,7 +545,7 @@ function App() {
 
       // Check audioContext and setup if needed
       if (!audioContextRef.current) {
-        setupWebAudio(player);
+        setupWebAudio(player, isVideo);
       }
 
       setIsRecording(true);
@@ -801,8 +805,8 @@ function App() {
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24">
-                    <rect x="6" y="3" width="4" height="18" rx="2" fill="white" />
-                    <rect x="14" y="3" width="4" height="18" rx="2" fill="white" />
+                    <rect x="6.5" y="3" width="3" height="18" rx="1.2" fill="white" />
+                    <rect x="14.5" y="3" width="3" height="18" rx="1.2" fill="white" />
                   </svg>
                 ) : (
                   <svg viewBox="0 0 24 24">
