@@ -367,7 +367,7 @@ function App() {
 
       // Draw Floating Card Player Card (Centered in 720x1280 logical viewport space)
       const cardWidth = 560;
-      const cardHeight = 910;
+      const cardHeight = 960;
       const cardX = (width - cardWidth) / 2;
       const cardY = (height - cardHeight) / 2;
       const cardRadius = 75;
@@ -421,9 +421,9 @@ function App() {
       }
 
       // 4. Song Info text (perfect luxurious spacing)
-      const infoY = artY + artSize + 40;
+      const infoY = artY + artSize + 60;
       ctx.fillStyle = '#ffffff';
-      ctx.font = '800 36px Inter';
+      ctx.font = '800 22px Inter';
       ctx.textAlign = 'left';
 
       // Measure title and handle scrolling text if too long
@@ -439,7 +439,7 @@ function App() {
 
         // Draw scrolling text on the offscreen canvas
         offCtx.fillStyle = '#ffffff';
-        offCtx.font = '800 36px Inter';
+        offCtx.font = '800 22px Inter';
         offCtx.textAlign = 'left';
         offCtx.textBaseline = 'middle';
         
@@ -488,11 +488,11 @@ function App() {
 
       // Draw Artist
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.font = '500 24px Inter';
-      ctx.fillText(songArtist, cardX + artPadding, infoY + 42);
+      ctx.font = '500 20px Inter';
+      ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
 
       // 5. Seekbar
-      const seekY = infoY + 90;
+      const seekY = infoY + 80;
       const seekWidth = cardWidth - (artPadding * 2);
       
       // Track bg
@@ -512,7 +512,7 @@ function App() {
 
       // Time labels
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-      ctx.font = '600 20px Inter';
+      ctx.font = '500 18px Inter';
       ctx.textAlign = 'left';
       ctx.fillText(formatTime(curT), cardX + artPadding, seekY + 38);
       
@@ -521,55 +521,53 @@ function App() {
       ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 38);
 
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
-      const ctrlY = seekY + 70;
+      const ctrlY = seekY + 85;
       const btnCenter = cardX + cardWidth / 2;
 
       // Skip Back (<<) - Left
       ctx.save();
       ctx.translate(btnCenter - 120, ctrlY);
-      ctx.scale(2.5, 2.5);
+      ctx.scale(3.2, 3.2);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.0;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       
-      // polygon points="19 20 9 12 19 4 19 20"
       ctx.beginPath();
-      ctx.moveTo(19 - 12, 20 - 12);
-      ctx.lineTo(9 - 12, 12 - 12);
-      ctx.lineTo(19 - 12, 4 - 12);
+      // Left triangle
+      ctx.moveTo(0.5, -6);
+      ctx.lineTo(-8.5, 0);
+      ctx.lineTo(0.5, 6);
       ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // polygon points="9 20 2 12 9 4 9 20"
-      ctx.beginPath();
-      ctx.moveTo(9 - 12, 20 - 12);
-      ctx.lineTo(2 - 12, 12 - 12);
-      ctx.lineTo(9 - 12, 4 - 12);
+      
+      // Right triangle
+      ctx.moveTo(8.5, -6);
+      ctx.lineTo(-0.5, 0);
+      ctx.lineTo(8.5, 6);
       ctx.closePath();
+      
       ctx.fill();
       ctx.stroke();
       ctx.restore();
 
-      // Large Center Play / Pause Button (custom shape with stroke anti-aliasing)
+      // Large Center Play / Pause Button (iPhone-style)
       ctx.save();
       ctx.translate(btnCenter, ctrlY);
-      ctx.scale(3.0, 3.0);
+      ctx.scale(4.2, 4.2);
       ctx.fillStyle = '#ffffff';
       if (isPlaying) {
-        // Draw rounded Pause bars (x=6, y=4, w=4, h=16, rx=1.5)
+        // iPhone-style rounded Pause bars (elongated, slimmer)
         ctx.beginPath();
-        ctx.roundRect(6 - 12, 4 - 12, 4, 16, 1.5);
-        ctx.roundRect(14 - 12, 4 - 12, 4, 16, 1.5);
+        ctx.roundRect(-6.5, -10, 4.5, 20, 1.5);
+        ctx.roundRect(2, -10, 4.5, 20, 1.5);
         ctx.fill();
       } else {
         // Draw large robust Play triangle with smooth stroke edges
         ctx.beginPath();
-        ctx.moveTo(7.5 - 12, 6.5 - 12);
-        ctx.lineTo(16.5 - 12, 12 - 12);
-        ctx.lineTo(7.5 - 12, 17.5 - 12);
+        ctx.moveTo(-5, -8);
+        ctx.lineTo(7, 0);
+        ctx.lineTo(-5, 8);
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = '#ffffff';
@@ -582,34 +580,32 @@ function App() {
       // Skip Forward (>>) - Right
       ctx.save();
       ctx.translate(btnCenter + 120, ctrlY);
-      ctx.scale(2.5, 2.5);
+      ctx.scale(3.2, 3.2);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1.0;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
-      // polygon points="5 4 15 12 5 20 5 4"
       ctx.beginPath();
-      ctx.moveTo(5 - 12, 4 - 12);
-      ctx.lineTo(15 - 12, 12 - 12);
-      ctx.lineTo(5 - 12, 20 - 12);
+      // Left triangle
+      ctx.moveTo(-8.5, -6);
+      ctx.lineTo(0.5, 0);
+      ctx.lineTo(-8.5, 6);
       ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // polygon points="15 4 22 12 15 20 15 4"
-      ctx.beginPath();
-      ctx.moveTo(15 - 12, 4 - 12);
-      ctx.lineTo(22 - 12, 12 - 12);
-      ctx.lineTo(15 - 12, 20 - 12);
+      
+      // Right triangle
+      ctx.moveTo(-0.5, -6);
+      ctx.lineTo(8.5, 0);
+      ctx.lineTo(-0.5, 6);
       ctx.closePath();
+      
       ctx.fill();
       ctx.stroke();
       ctx.restore();
 
       // 7. Volume bar (with scaled up, beautiful speaker icons)
-      const volY = ctrlY + 65;
+      const volY = ctrlY + 80;
       const volX = cardX + artPadding + 48; // Shift slider to give space for larger speakers
       const volWidth = cardWidth - (artPadding * 2) - 96;
       
@@ -673,7 +669,7 @@ function App() {
       ctx.restore();
 
       // 8. Device selector pill button at the bottom center (Perfect tight spacing)
-      const pillY = volY + 55;
+      const pillY = volY + 50;
       const pillWidth = 190;
       const pillHeight = 52;
       const pillX = btnCenter - pillWidth / 2;
@@ -744,9 +740,13 @@ function App() {
       // Stop recording
       isRecordingRef.current = false;
       setIsRecording(false);
+      setIsPlaying(false);
       
       const player = getActivePlayer();
       if (player) {
+        if (!player.paused) {
+          player.pause();
+        }
         player.volume = volume; // Restore user's default volume
       }
 
@@ -1280,14 +1280,16 @@ function App() {
             {/* Middle Playback buttons - centered without star */}
             <div className="control-center">
               <button className="ctrl-btn small">
-                <i className="fas fa-backward"></i>
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
+                  <path d="M11 6 L2 12 L11 18 Z M20 6 L11 12 L20 18 Z" />
+                </svg>
               </button>
 
               <button className="ctrl-btn play-btn" onClick={togglePlay}>
                 {isPlaying ? (
                   <svg viewBox="0 0 24 24">
-                    <rect x="6" y="4" width="4" height="16" rx="1.2" fill="white" />
-                    <rect x="14" y="4" width="4" height="16" rx="1.2" fill="white" />
+                    <rect x="5.5" y="2" width="4.5" height="20" rx="1.5" fill="white" />
+                    <rect x="14" y="2" width="4.5" height="20" rx="1.5" fill="white" />
                   </svg>
                 ) : (
                   <svg viewBox="0 0 24 24">
@@ -1297,7 +1299,9 @@ function App() {
               </button>
 
               <button className="ctrl-btn small">
-                <i className="fas fa-forward"></i>
+                <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
+                  <path d="M4 6 L13 12 L4 18 Z M13 6 L22 12 L13 18 Z" />
+                </svg>
               </button>
             </div>
           </div>

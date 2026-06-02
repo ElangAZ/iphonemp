@@ -241,7 +241,7 @@ body {
 }
 
 .song-name {
-  font-size: 23px;
+  font-size: 16px;
   font-weight: 700;
   white-space: nowrap;
   display: inline-block;
@@ -260,7 +260,7 @@ body {
 }
 
 .song-artist {
-  font-size: 16px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(255,255,255,0.45);
   margin-top: 4px;
@@ -316,7 +316,10 @@ body {
   display: flex;
   justify-content: space-between;
   color: rgba(255,255,255,0.5);
-  font-size: 13px;
+}
+
+.time-labels span {
+  font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.1px;
 }
@@ -353,13 +356,13 @@ body {
 .ctrl-btn:active { transform: scale(0.88); }
 
 .ctrl-btn.small {
-  font-size: 26px;
+  font-size: 30px;
   color: #ffffff;
 }
 
 .play-btn {
-  width: 75px;
-  height: 75px;
+  width: 70px;
+  height: 70px;
   background: none;
   padding: 0;
   display: flex;
@@ -369,7 +372,7 @@ body {
 
 .play-btn:active { transform: scale(0.9); }
 
-.play-btn svg { width: 62px; height: 62px; }
+.play-btn svg { width: 54px; height: 54px; }
 .play-btn svg polygon,
 .play-btn svg path {
   fill: white;
@@ -461,7 +464,6 @@ body {
   fill: #ffffff;
 }
 
-/* Transcode Modal Styling */
 .transcode-modal-overlay {
   position: fixed;
   top: 0;
@@ -476,11 +478,15 @@ body {
   justify-content: center;
   z-index: 9999;
   animation: fadeIn 0.3s ease;
+  overflow-y: auto;
+  padding: 20px;
 }
 
 .transcode-modal-card {
   width: 90%;
   max-width: 480px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
   background: rgba(25, 25, 25, 0.75);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 28px;
@@ -495,14 +501,15 @@ body {
 
 .close-modal-btn {
   position: absolute;
-  top: 20px;
-  right: 20px;
+  top: 16px;
+  right: 16px;
   background: none;
   border: none;
   font-size: 28px;
   color: rgba(255, 255, 255, 0.45);
   cursor: pointer;
   transition: color 0.15s ease;
+  z-index: 10;
 }
 
 .close-modal-btn:hover {
@@ -843,13 +850,13 @@ body {
 }
 
 .inline-edit-input.title-input {
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: -0.5px;
 }
 
 .inline-edit-input.artist-input {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.85);
 }
@@ -887,6 +894,43 @@ body {
 
   .player-wrap {
     padding: 10px 0 !important;
+  }
+
+  /* Compact Modal for Mobile */
+  .transcode-modal-card {
+    padding: 24px 16px !important;
+    border-radius: 20px !important;
+    max-height: calc(100vh - 40px) !important;
+  }
+
+  .transcode-header {
+    margin-bottom: 16px !important;
+  }
+
+  .success-icon {
+    font-size: 36px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .transcode-header h3 {
+    font-size: 18px !important;
+  }
+
+  .option-box {
+    padding: 12px !important;
+    gap: 8px !important;
+  }
+
+  .option-info h4 {
+    font-size: 14px !important;
+  }
+
+  .option-info p {
+    font-size: 11.5px !important;
+  }
+
+  .mobile-warning-box {
+    padding: 10px !important;
   }
 }
 
