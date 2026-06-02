@@ -739,6 +739,18 @@ function App() {
     return parseFloat(timeStr) || 0;
   };
 
+  const normalizeRenderRange = (startStr, endStr, durationSeconds = 0) => {
+    let start = Math.max(0, parseTimeToSeconds(startStr));
+    let end = Math.max(start + 0.1, parseTimeToSeconds(endStr));
+    if (durationSeconds > 0) {
+      if (start >= durationSeconds) {
+        return { start: durationSeconds, end: durationSeconds };
+      }
+      end = Math.min(end, durationSeconds);
+    }
+    return { start, end };
+  };
+
   // Video recording toggle handler (High definition canvas output with Web Audio context source)
   const toggleVideoRecord = async () => {
     if (isRecordingRef.current) {
@@ -807,9 +819,44 @@ function App() {
         });
       }
 
-      // 3. Seek player to snippet start time and wait for seek to complete
-      const startSecs = parseTimeToSeconds(renderStart);
-      player.currentTime = startSecs;
+      // 3. Validate render start/end and wait for player metadata before seeking
+      const durationSeconds = player.duration || 0;
+      const { start, end } = normalizeRenderRange(renderStart, renderEnd, durationSeconds);
+      if (durationSeconds > 0 && start >= durationSeconds) {
+        alert('Waktu render tidak valid. Pastikan "Mulai" berada di dalam durasi lagu/video.');
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        return;
+      }
+
+      if (end <= start) {
+        alert('Waktu render tidak valid. Pastikan "Sampai" lebih besar dari "Mulai".');
+        isRecordingRef.current = false;
+        setIsRecording(false);
+        return;
+      }
+
+      // Keep refs in sync with the validated snippet range for rendering and stopping logic
+      const validatedStart = formatTime(start);
+      const validatedEnd = formatTime(end);
+      renderStartRef.current = validatedStart;
+      renderEndRef.current = validatedEnd;
+      if (validatedStart !== renderStart) setRenderStart(validatedStart);
+      if (validatedEnd !== renderEnd) setRenderEnd(validatedEnd);
+
+      if (player.readyState < 1) {
+        await new Promise((resolve) => {
+          const onLoaded = () => {
+            player.removeEventListener('loadedmetadata', onLoaded);
+            resolve();
+          };
+          player.addEventListener('loadedmetadata', onLoaded);
+          // Safety timeout if loadedmetadata never fires
+          setTimeout(resolve, 1500);
+        });
+      }
+
+      player.currentTime = start;
       await new Promise((resolve) => {
         const onSeeked = () => {
           player.removeEventListener('seeked', onSeeked);
@@ -817,7 +864,7 @@ function App() {
         };
         player.addEventListener('seeked', onSeeked);
         // Safety timeout in case seeked event never fires (some mobile browsers)
-        setTimeout(resolve, 1000);
+        setTimeout(resolve, 1500);
       });
 
       // Configure resolution dynamically on the physical canvas object
