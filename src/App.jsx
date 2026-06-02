@@ -86,6 +86,13 @@ function App() {
     return isVideo ? videoRef.current : audioRef.current;
   };
 
+  // Helper to get actual playing state from the media element when available
+  const getActualPlaying = () => {
+    const player = getActivePlayer();
+    if (player) return !player.paused;
+    return isPlaying;
+  };
+
   // Setup Web Audio API for clean recording stream
   const setupWebAudio = (element, isVideoType) => {
     if (!audioContextRef.current) {
@@ -285,6 +292,7 @@ function App() {
       const activePlayer = isVideoActive ? videoEl : audioRef.current;
       const curT = activePlayer ? activePlayer.currentTime : 0;
       const dur = activePlayer ? activePlayer.duration : 0;
+      const playing = activePlayer ? !activePlayer.paused : isPlaying;
 
       // Automatically stop rendering once custom end time limit is met
       if (isRecordingRef.current) {
@@ -551,29 +559,26 @@ function App() {
       ctx.stroke();
       ctx.restore();
 
-      // Large Center Play / Pause Button (iPhone-style)
+      // Large Center Play / Pause Button (updated to match FontAwesome style)
       ctx.save();
       ctx.translate(btnCenter, ctrlY);
-      ctx.scale(4.2, 4.2);
+      // Slightly reduce overall scale and increase bar thickness for visual parity
+      ctx.scale(3.6, 3.6);
       ctx.fillStyle = '#ffffff';
-      if (isPlaying) {
-        // iPhone-style rounded Pause bars (elongated, slimmer)
+      if (playing) {
+        // Pause bars with moderate corner radius (less rounded)
         ctx.beginPath();
-        ctx.roundRect(-6.5, -10, 4.5, 20, 1.5);
-        ctx.roundRect(2, -10, 4.5, 20, 1.5);
+        ctx.roundRect(-7.5, -11, 6, 22, 2.2);
+        ctx.roundRect(1.5, -11, 6, 22, 2.2);
         ctx.fill();
       } else {
-        // Draw large robust Play triangle with smooth stroke edges
+        // Play triangle with slightly softer points (not too sharp)
         ctx.beginPath();
-        ctx.moveTo(-5, -8);
-        ctx.lineTo(7, 0);
-        ctx.lineTo(-5, 8);
+        ctx.moveTo(-6.5, -8.5);
+        ctx.lineTo(8, 0);
+        ctx.lineTo(-6.5, 8.5);
         ctx.closePath();
         ctx.fill();
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 1.0;
-        ctx.lineJoin = 'round';
-        ctx.stroke();
       }
       ctx.restore();
 
@@ -1023,6 +1028,10 @@ function App() {
       }
     };
 
+    // Keep React state in sync with native playback events
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+
     // Listen to both elements
     const audioEl = audioRef.current;
     const videoEl = videoRef.current;
@@ -1030,11 +1039,15 @@ function App() {
     if (audioEl) {
       audioEl.addEventListener('timeupdate', handleTimeUpdate);
       audioEl.addEventListener('loadedmetadata', handleLoadedMetadata);
+      audioEl.addEventListener('play', handlePlay);
+      audioEl.addEventListener('pause', handlePause);
       audioEl.addEventListener('ended', handleEnded);
     }
     if (videoEl) {
       videoEl.addEventListener('timeupdate', handleTimeUpdate);
       videoEl.addEventListener('loadedmetadata', handleLoadedMetadata);
+      videoEl.addEventListener('play', handlePlay);
+      videoEl.addEventListener('pause', handlePause);
       videoEl.addEventListener('ended', handleEnded);
     }
 
@@ -1042,11 +1055,15 @@ function App() {
       if (audioEl) {
         audioEl.removeEventListener('timeupdate', handleTimeUpdate);
         audioEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        audioEl.removeEventListener('play', handlePlay);
+        audioEl.removeEventListener('pause', handlePause);
         audioEl.removeEventListener('ended', handleEnded);
       }
       if (videoEl) {
         videoEl.removeEventListener('timeupdate', handleTimeUpdate);
         videoEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
+        videoEl.removeEventListener('play', handlePlay);
+        videoEl.removeEventListener('pause', handlePause);
         videoEl.removeEventListener('ended', handleEnded);
       }
     };
@@ -1285,17 +1302,9 @@ function App() {
                 </svg>
               </button>
 
-              <button className="ctrl-btn play-btn" onClick={togglePlay}>
-                {isPlaying ? (
-                  <svg viewBox="0 0 24 24">
-                    <rect x="5.5" y="2" width="4.5" height="20" rx="1.5" fill="white" />
-                    <rect x="14" y="2" width="4.5" height="20" rx="1.5" fill="white" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24">
-                    <polygon points="7.5 6.5 16.5 12 7.5 17.5 7.5 6.5" />
-                  </svg>
-                )}
+              {/* Prefer actual media element state when available to avoid visual desync */}
+              <button className="ctrl-btn play-btn" onClick={togglePlay} aria-label={getActualPlaying() ? 'Pause' : 'Play'}>
+                <i className={`fa-solid ${getActualPlaying() ? 'fa-pause' : 'fa-play'}`} aria-hidden="true"></i>
               </button>
 
               <button className="ctrl-btn small">

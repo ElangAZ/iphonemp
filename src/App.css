@@ -361,8 +361,8 @@ body {
 }
 
 .play-btn {
-  width: 70px;
-  height: 70px;
+  width: 56px;
+  height: 56px;
   background: none;
   padding: 0;
   display: flex;
@@ -372,7 +372,12 @@ body {
 
 .play-btn:active { transform: scale(0.9); }
 
-.play-btn svg { width: 54px; height: 54px; }
+.play-btn svg { width: 40px; height: 40px; }
+.play-btn i {
+  font-size: 28px;
+  color: white;
+  line-height: 1;
+}
 .play-btn svg polygon,
 .play-btn svg path {
   fill: white;
