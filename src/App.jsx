@@ -27,6 +27,8 @@ function App() {
   const [renderEnd, setRenderEnd] = useState('0:30');
   const [renderResolution, setRenderResolution] = useState('720'); // '720' or '1080'
   const [renderFps, setRenderFps] = useState('30'); // '30' or '60'
+  const [isAudioFadeEnabled, setIsAudioFadeEnabled] = useState(true); // Toggle audio fading
+  const [audioFadeDuration, setAudioFadeDuration] = useState('1'); // Audio fade duration in seconds
 
   const audioRef = useRef(null);
   const videoRef = useRef(null);
@@ -44,12 +46,17 @@ function App() {
   const isRecordingRef = useRef(isRecording);
   const renderStartRef = useRef(renderStart);
   const renderEndRef = useRef(renderEnd);
+  const isAudioFadeEnabledRef = useRef(isAudioFadeEnabled);
+  const audioFadeDurationRef = useRef(audioFadeDuration);
+  const toggleVideoRecordRef = useRef(null);
 
   useEffect(() => {
     isRecordingRef.current = isRecording;
     renderStartRef.current = renderStart;
     renderEndRef.current = renderEnd;
-  }, [isRecording, renderStart, renderEnd]);
+    isAudioFadeEnabledRef.current = isAudioFadeEnabled;
+    audioFadeDurationRef.current = audioFadeDuration;
+  }, [isRecording, renderStart, renderEnd, isAudioFadeEnabled, audioFadeDuration]);
 
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
@@ -59,14 +66,20 @@ function App() {
 
   // Automatically check if title overflows to trigger smooth marquee scrolling
   useEffect(() => {
-    if (titleRef.current && containerRef.current) {
-      const titleWidth = titleRef.current.scrollWidth;
-      const containerWidth = containerRef.current.clientWidth;
-      setIsMarquee(titleWidth > containerWidth);
-    } else {
-      setIsMarquee(false);
-    }
-  }, [songTitle, isVideo]);
+    const checkMarquee = () => {
+      if (titleRef.current && containerRef.current) {
+        const titleWidth = titleRef.current.scrollWidth;
+        const containerWidth = containerRef.current.clientWidth;
+        setIsMarquee(titleWidth > containerWidth);
+      } else {
+        setIsMarquee(false);
+      }
+    };
+
+    // Use a small timeout to ensure the DOM has completed paint/layout and fonts are loaded
+    const timer = setTimeout(checkMarquee, 100);
+    return () => clearTimeout(timer);
+  }, [songTitle, isVideo, isEditingText]);
 
   // Sync active player source
   const getActivePlayer = () => {
@@ -273,13 +286,67 @@ function App() {
       const curT = activePlayer ? activePlayer.currentTime : 0;
       const dur = activePlayer ? activePlayer.duration : 0;
 
+      // Automatically stop rendering once custom end time limit is met
+      if (isRecordingRef.current) {
+        const startSecs = parseTimeToSeconds(renderStartRef.current);
+        const limitSecs = parseTimeToSeconds(renderEndRef.current);
+        
+        let targetVolume = volume; // User's preferred volume (base line)
+
+        if (isAudioFadeEnabledRef.current) {
+          const fadeDuration = parseFloat(audioFadeDurationRef.current) || 1.0; 
+
+          if (curT < startSecs + fadeDuration) {
+            // Fade In: ramp up volume from 0 to target volume
+            const elapsed = curT - startSecs;
+            const factor = Math.max(0, Math.min(1, elapsed / fadeDuration));
+            targetVolume = volume * factor;
+          } else if (curT > limitSecs - fadeDuration) {
+            // Fade Out: ramp down volume from target volume to 0
+            const remaining = limitSecs - curT;
+            const factor = Math.max(0, Math.min(1, remaining / fadeDuration));
+            targetVolume = volume * factor;
+          }
+        }
+
+        if (activePlayer) {
+          activePlayer.volume = targetVolume;
+        }
+
+        if (curT >= limitSecs) {
+          if (activePlayer) {
+            activePlayer.pause();
+            activePlayer.volume = volume; // Restore base volume
+          }
+          if (toggleVideoRecordRef.current) {
+            toggleVideoRecordRef.current(); // Complete snippet rendering
+          }
+          return; // Stop animation loop
+        }
+      }
+
       // 1. Draw heavy blur background using cover art (on physical canvas dimensions)
       ctx.clearRect(0, 0, canvasWidth, canvasHeight);
       ctx.save();
       
       if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
-        ctx.filter = 'blur(80px) saturate(1.5) brightness(1.25)';
-        ctx.drawImage(coverImgObj, -200, -200, canvasWidth + 400, canvasHeight + 400);
+        // High-performance ultra-dreamy blur (16x16 downscale + 45px filter) for perfect iOS-style color blending
+        ctx.imageSmoothingEnabled = true;
+        
+        const tinyCanvas = document.createElement('canvas');
+        tinyCanvas.width = 16;
+        tinyCanvas.height = 16;
+        const tinyCtx = tinyCanvas.getContext('2d');
+        tinyCtx.drawImage(coverImgObj, 0, 0, 16, 16);
+        
+        ctx.save();
+        ctx.filter = 'blur(45px) saturate(1.7) brightness(1.05)';
+        ctx.drawImage(tinyCanvas, -150, -150, canvasWidth + 300, canvasHeight + 300);
+        ctx.restore();
+        
+        // Add a premium subtle dark overlay
+        ctx.fillStyle = 'rgba(10, 10, 20, 0.35)';
+        ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       } else {
         // Fallback dark gradient background
         const bgGrad = ctx.createRadialGradient(canvasWidth * 0.3, canvasHeight * 0.2, 0, canvasWidth * 0.3, canvasHeight * 0.2, canvasHeight);
@@ -386,7 +453,7 @@ function App() {
         const grad = offCtx.createLinearGradient(0, 0, maxTextWidth, 0);
         
         // Fade-in appears only when text is moving (i.e. not in the initial/paused phase)
-        if (scrollPauseTicks > 0 || Math.abs(textScrollOffset) < 15) {
+        if (scrollPauseTicks > 0 || Math.abs(textScrollOffset) < 1) {
           // Stopped/paused starting phase: only fade out on the right
           grad.addColorStop(0, 'rgba(0,0,0,1)');
           grad.addColorStop(0.9, 'rgba(0,0,0,1)');
@@ -672,16 +739,23 @@ function App() {
   };
 
   // Video recording toggle handler (High definition canvas output with Web Audio context source)
-  const toggleVideoRecord = () => {
-    if (isRecording) {
+  const toggleVideoRecord = async () => {
+    if (isRecordingRef.current) {
       // Stop recording
+      isRecordingRef.current = false;
+      setIsRecording(false);
+      
+      const player = getActivePlayer();
+      if (player) {
+        player.volume = volume; // Restore user's default volume
+      }
+
       if (mediaRecorderRef.current) {
         mediaRecorderRef.current.stop();
       }
       if (animationFrameRef.current) {
         cancelAnimationFrame(animationFrameRef.current);
       }
-      setIsRecording(false);
     } else {
       // Start recording
       const canvas = canvasRef.current;
@@ -698,18 +772,48 @@ function App() {
         setupWebAudio(player, isVideo);
       }
 
-      // Seek active player directly to snippet starting time
-      const startSecs = parseTimeToSeconds(renderStart);
-      player.currentTime = startSecs;
-
+      isRecordingRef.current = true;
       setIsRecording(true);
       recordedChunksRef.current = [];
 
-      // Create high-res artwork image object to render inside card
-      const coverImgObj = new Image();
-      if (artworkUrl) {
-        coverImgObj.src = artworkUrl;
+      // 1. Wait for all web fonts to be fully loaded (critical for canvas text rendering on mobile)
+      try {
+        await document.fonts.ready;
+      } catch (e) {
+        console.warn("Font loading check failed, proceeding anyway:", e);
       }
+
+      // 2. Prepare cover image - clone to a fresh Image to guarantee load state
+      let coverImgObj = null;
+      const domImg = document.querySelector('.artwork-img');
+      if (domImg && domImg.src && domImg.naturalWidth > 0) {
+        // DOM image is already loaded and valid, use it directly
+        coverImgObj = domImg;
+      } else if (artworkUrl) {
+        // Create new image and wait for it to fully load
+        coverImgObj = new Image();
+        coverImgObj.crossOrigin = 'anonymous';
+        await new Promise((resolve) => {
+          coverImgObj.onload = resolve;
+          coverImgObj.onerror = resolve; // proceed even if image fails
+          coverImgObj.src = artworkUrl;
+          // If already cached/complete, resolve immediately
+          if (coverImgObj.complete && coverImgObj.naturalWidth > 0) resolve();
+        });
+      }
+
+      // 3. Seek player to snippet start time and wait for seek to complete
+      const startSecs = parseTimeToSeconds(renderStart);
+      player.currentTime = startSecs;
+      await new Promise((resolve) => {
+        const onSeeked = () => {
+          player.removeEventListener('seeked', onSeeked);
+          resolve();
+        };
+        player.addEventListener('seeked', onSeeked);
+        // Safety timeout in case seeked event never fires (some mobile browsers)
+        setTimeout(resolve, 1000);
+      });
 
       // Configure resolution dynamically on the physical canvas object
       if (renderResolution === '1080') {
@@ -724,7 +828,7 @@ function App() {
       const width = canvas.width;
       const height = canvas.height;
 
-      // Start rendering loop immediately
+      // Start rendering loop (fonts loaded, image ready, player seeked)
       startCanvasRenderLoop(ctx, width, height, coverImgObj, isVideo, videoRef.current);
 
       // Capture video track at dynamic framerate (30 FPS or 60 FPS)
@@ -762,7 +866,8 @@ function App() {
       try {
         const options = { 
           mimeType,
-          videoBitsPerSecond: renderResolution === '1080' ? 6000000 : 3500000 // 6 Mbps for 1080p, 3.5 Mbps for 720p
+          videoBitsPerSecond: renderResolution === '1080' ? 6000000 : 3500000, // 6 Mbps for 1080p, 3.5 Mbps for 720p
+          audioBitsPerSecond: 320000 // Studio grade 320kbps audio encoding
         };
         recorder = new MediaRecorder(outputStream, options);
       } catch (e) {
@@ -787,12 +892,16 @@ function App() {
       mediaRecorderRef.current = recorder;
       recorder.start();
 
-      // Ensure the player is playing while recording
+      // 4. Start playback AFTER recorder is capturing (so no frames are lost)
       if (player.paused) {
-        player.play().then(() => setIsPlaying(true));
+        player.play().then(() => setIsPlaying(true)).catch(err => console.error("Play failed:", err));
       }
     }
   };
+
+  useEffect(() => {
+    toggleVideoRecordRef.current = toggleVideoRecord;
+  }, [toggleVideoRecord]);
 
   // Handle direct WebM file download
   const handleDownloadWebm = () => {
@@ -842,8 +951,8 @@ function App() {
       const arrayBuffer = await webmBlob.arrayBuffer();
       ffmpeg.FS('writeFile', 'input.webm', new Uint8Array(arrayBuffer));
 
-      // Execute conversion: transcode audio to AAC, copy video track (ultra-fast container swapping)
-      await ffmpeg.run('-i', 'input.webm', '-c:v', 'copy', '-c:a', 'aac', 'output.mp4');
+      // Execute conversion: transcode audio to AAC at high-fidelity 320k, copy video track (ultra-fast container swapping)
+      await ffmpeg.run('-i', 'input.webm', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', 'output.mp4');
 
       // Read output
       const data = ffmpeg.FS('readFile', 'output.mp4');
@@ -892,7 +1001,9 @@ function App() {
           const limitSecs = parseTimeToSeconds(renderEndRef.current);
           if (player.currentTime >= limitSecs) {
             player.pause();
-            toggleVideoRecord(); // Complete snippet rendering
+            if (toggleVideoRecordRef.current) {
+              toggleVideoRecordRef.current(); // Complete snippet rendering
+            }
           }
         }
       }
@@ -905,8 +1016,10 @@ function App() {
 
     const handleEnded = () => {
       setIsPlaying(false);
-      if (isRecording) {
-        toggleVideoRecord(); // End recording automatically when song completes
+      if (isRecordingRef.current) {
+        if (toggleVideoRecordRef.current) {
+          toggleVideoRecordRef.current(); // End recording automatically when song completes
+        }
       }
     };
 
@@ -970,6 +1083,11 @@ function App() {
         {/* Snippet Render Settings Panel */}
         {!isRecording && (
           <div className="snippet-settings-panel">
+            {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+              <div className="mobile-render-warning">
+                ⚠️ Render di HP rentan crash (OOM). Sangat disarankan set 720p & 30 FPS.
+              </div>
+            )}
             <div className="settings-row">
               <label>Mulai:</label>
               <input 
@@ -1012,6 +1130,32 @@ function App() {
                 <option value="60">60 FPS</option>
               </select>
             </div>
+            <div className="settings-row-separator" />
+            <div className="settings-row checkbox-row">
+              <label htmlFor="audioFadeToggle">Fade In/Out:</label>
+              <input 
+                id="audioFadeToggle"
+                type="checkbox" 
+                checked={isAudioFadeEnabled} 
+                onChange={(e) => setIsAudioFadeEnabled(e.target.checked)}
+                className="snippet-checkbox"
+              />
+            </div>
+            {isAudioFadeEnabled && (
+              <div className="settings-row">
+                <label>Durasi Fade (s):</label>
+                <input 
+                  type="number" 
+                  min="0.5"
+                  max="15"
+                  step="0.5"
+                  value={audioFadeDuration} 
+                  onChange={(e) => setAudioFadeDuration(e.target.value)} 
+                  placeholder="1"
+                  className="snippet-input duration-input"
+                />
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -1097,7 +1241,7 @@ function App() {
                   />
                 </div>
               ) : (
-                <div onClick={() => setIsEditingText(true)} style={{ cursor: 'pointer' }} title="Klik untuk edit nama & artis">
+                <div onClick={() => setIsEditingText(true)} style={{ cursor: 'pointer', width: '100%', overflow: 'hidden' }} title="Klik untuk edit nama & artis">
                   <div className={`title-container ${isMarquee ? 'has-marquee' : ''}`} ref={containerRef}>
                     <span 
                       className={`song-name ${isMarquee ? 'marquee' : ''}`} 
