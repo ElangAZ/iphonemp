@@ -15,6 +15,9 @@ function App() {
   const [isRecording, setIsRecording] = useState(false);
   const [manualCoverSet, setManualCoverSet] = useState(false);
   const [isMarquee, setIsMarquee] = useState(false);
+  const [showFollowModal, setShowFollowModal] = useState(true);
+  const [deviceName, setDeviceName] = useState('senux');
+  const [isEditingDevice, setIsEditingDevice] = useState(false);
 
   // FFmpeg transcode states
   const [showModal, setShowModal] = useState(false);
@@ -392,14 +395,7 @@ function App() {
       ctx.fill();
       ctx.restore();
 
-      // Apply border path inside card
-      ctx.save();
-      ctx.beginPath();
-      ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
-      ctx.lineWidth = 2.5;
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.stroke();
-      ctx.restore();
+      // Card border removed as requested to avoid white line when rendering
 
       // 3. Draw Album Cover art inside the Card with aspect ratio protection (Crop & Center)
       const artPadding = 35;
@@ -529,16 +525,16 @@ function App() {
       ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 38);
 
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
-      const ctrlY = seekY + 85;
+      const ctrlY = seekY + 90;
       const btnCenter = cardX + cardWidth / 2;
 
       // Skip Back (<<) - Left
       ctx.save();
-      ctx.translate(btnCenter - 120, ctrlY);
-      ctx.scale(3.2, 3.2);
+      ctx.translate(btnCenter - 95, ctrlY);
+      ctx.scale(2.8, 2.4);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.0;
+      ctx.lineWidth = 2.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       
@@ -563,13 +559,13 @@ function App() {
       ctx.save();
       ctx.translate(btnCenter, ctrlY);
       // Slightly reduce overall scale and increase bar thickness for visual parity
-      ctx.scale(3.6, 3.6);
+      ctx.scale(2.5, 2.5);
       ctx.fillStyle = '#ffffff';
       if (playing) {
-        // Pause bars with moderate corner radius (less rounded)
+        // Pause bars with balanced corner radius
         ctx.beginPath();
-        ctx.roundRect(-7.5, -11, 6, 22, 2.2);
-        ctx.roundRect(1.5, -11, 6, 22, 2.2);
+        ctx.roundRect(-7.5, -11, 6, 22, 1.5);
+        ctx.roundRect(1.5, -11, 6, 22, 1.5);
         ctx.fill();
       } else {
         // Play triangle with slightly softer points (not too sharp)
@@ -584,11 +580,11 @@ function App() {
 
       // Skip Forward (>>) - Right
       ctx.save();
-      ctx.translate(btnCenter + 120, ctrlY);
-      ctx.scale(3.2, 3.2);
+      ctx.translate(btnCenter + 95, ctrlY);
+      ctx.scale(2.8, 2.4);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.0;
+      ctx.lineWidth = 2.2;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
@@ -614,10 +610,10 @@ function App() {
       const volX = cardX + artPadding + 48; // Shift slider to give space for larger speakers
       const volWidth = cardWidth - (artPadding * 2) - 96;
       
-      // Left low-volume speaker icon (Scaled up by 1.4x)
+      // Left low-volume speaker icon (Scaled up by 1.8x)
       ctx.save();
-      ctx.translate(volX - 42, volY - 7);
-      ctx.scale(1.4, 1.4);
+      ctx.translate(volX - 42, volY - 16.6);
+      ctx.scale(1.8, 1.8);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.beginPath();
       ctx.moveTo(9, 6);
@@ -642,10 +638,10 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.fill();
 
-      // Right high-volume speaker icon with waves (Scaled up by 1.4x)
+      // Right high-volume speaker icon with waves (Scaled up by 1.8x)
       ctx.save();
-      ctx.translate(volX + volWidth + 14, volY - 7);
-      ctx.scale(1.4, 1.4);
+      ctx.translate(volX + volWidth + 14, volY - 16.6);
+      ctx.scale(1.8, 1.8);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.lineWidth = 1.8;
@@ -672,26 +668,29 @@ function App() {
       ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
       ctx.stroke();
       ctx.restore();
-
-      // 8. Device selector pill button at the bottom center (Perfect tight spacing)
+      
+      // 8. Device selector pill button at the bottom center (Dynamic centering & width based on custom name)
+      ctx.font = '600 22px Inter';
+      const textWidth = ctx.measureText(deviceName).width;
+      
       const pillY = volY + 50;
-      const pillWidth = 190;
+      const pillWidth = 32 + 20 + 14 + textWidth + 32; 
       const pillHeight = 52;
       const pillX = btnCenter - pillWidth / 2;
       const pillRadius = 26;
-
+ 
       ctx.beginPath();
       ctx.roundRect(pillX, pillY, pillWidth, pillHeight, pillRadius);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.fill();
-
+ 
       // AirPlay icon inside pill
       ctx.save();
-      ctx.translate(pillX + 32, pillY + 26);
+      ctx.translate(pillX + 32 + 10, pillY + 26);
       ctx.strokeStyle = '#ffffff';
       ctx.fillStyle = '#ffffff';
       ctx.lineWidth = 2.5;
-
+ 
       // AirPlay Triangle
       ctx.beginPath();
       ctx.moveTo(-10, 8);
@@ -699,23 +698,23 @@ function App() {
       ctx.lineTo(0, -4);
       ctx.closePath();
       ctx.fill();
-
+ 
       // AirPlay Arcs
       ctx.beginPath();
       ctx.arc(0, -1, 10, Math.PI + 0.5, Math.PI * 2 - 0.5);
       ctx.stroke();
-
+ 
       ctx.beginPath();
       ctx.arc(0, -1, 16, Math.PI + 0.5, Math.PI * 2 - 0.5);
       ctx.stroke();
       ctx.restore();
-
-      // Pill Text (senux)
+ 
+      // Pill Text (dynamic deviceName)
       ctx.fillStyle = '#ffffff';
       ctx.font = '600 22px Inter';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText('senux', pillX + 66, pillY + 26);
+      ctx.fillText(deviceName, pillX + 66, pillY + 26);
 
       ctx.restore(); // Restore scaled canvas context
 
@@ -1124,6 +1123,37 @@ function App() {
         style={{ backgroundImage: artworkUrl ? `url(${artworkUrl})` : 'none' }}
       />
 
+      {/* Social Media Follow Popup Overlay */}
+      {showFollowModal && (
+        <div className="follow-modal-overlay">
+          <div className="follow-modal-card">
+            <h2>Welcome to senux Player</h2>
+            <p>Dukung saya dengan follow sosial media berikut untuk terus mendapatkan update terbaru!</p>
+            
+            <div className="social-links-container">
+              <a href="https://www.tiktok.com/@snuqxcepele" target="_blank" rel="noopener noreferrer" className="social-link-btn tiktok">
+                <i className="fa-brands fa-tiktok"></i> TikTok
+              </a>
+              <a href="https://www.youtube.com/@snuqxcepele" target="_blank" rel="noopener noreferrer" className="social-link-btn youtube">
+                <i className="fa-brands fa-youtube"></i> YouTube
+              </a>
+              <a href="https://soundcloud.com/elang-29063036" target="_blank" rel="noopener noreferrer" className="social-link-btn soundcloud">
+                <i className="fa-brands fa-soundcloud"></i> SoundCloud
+              </a>
+            </div>
+
+            <button 
+              className="start-player-btn"
+              onClick={() => {
+                setShowFollowModal(false);
+              }}
+            >
+              Mulai Mendengarkan <i className="fas fa-arrow-right"></i>
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Control Buttons on top right with snippet settings */}
       <div className="top-controls-container">
         <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
@@ -1377,13 +1407,41 @@ function App() {
 
           {/* Bottom Device Selector Pill */}
           <div className="device-selector-container">
-            <button className="device-pill">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                <polygon points="12 12 17 21 7 21 12 12" fill="currentColor" stroke="none" />
-                <path d="M18.36 10.64a9 9 0 0 0-12.72 0M15.54 13.46a5 5 0 0 0-7.08 0" stroke="currentColor" strokeWidth="2" fill="none" />
-              </svg>
-              <span>senux</span>
-            </button>
+            {isEditingDevice ? (
+              <input 
+                type="text" 
+                value={deviceName} 
+                onChange={(e) => setDeviceName(e.target.value)}
+                onBlur={() => setIsEditingDevice(false)}
+                onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingDevice(false); }}
+                autoFocus
+                className="device-pill-input"
+                style={{
+                  background: 'rgba(255, 255, 255, 0.12)',
+                  border: 'none',
+                  borderRadius: '30px',
+                  padding: '8px 18px',
+                  color: '#ffffff',
+                  fontSize: '13.5px',
+                  fontWeight: '600',
+                  textAlign: 'center',
+                  outline: 'none',
+                  width: '130px'
+                }}
+              />
+            ) : (
+              <button 
+                className="device-pill" 
+                onClick={() => setIsEditingDevice(true)} 
+                title="Klik untuk ganti nama device"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                  <polygon points="12 12 17 21 7 21 12 12" fill="currentColor" stroke="none" />
+                  <path d="M18.36 10.64a9 9 0 0 0-12.72 0M15.54 13.46a5 5 0 0 0-7.08 0" stroke="currentColor" strokeWidth="2" fill="none" />
+                </svg>
+                <span>{deviceName}</span>
+              </button>
+            )}
           </div>
         </div>
       </div>

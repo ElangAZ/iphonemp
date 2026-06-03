@@ -1001,3 +1001,151 @@ body {
   width: 100%;
   box-sizing: border-box;
 }
+
+/* Premium Social Follow Modal Styles */
+.follow-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(25px);
+  -webkit-backdrop-filter: blur(25px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  animation: fadeIn 0.4s ease;
+  padding: 20px;
+}
+
+.follow-modal-card {
+  width: 100%;
+  max-width: 400px;
+  background: rgba(15, 15, 15, 0.55);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 30px;
+  padding: 32px;
+  box-shadow: 0 40px 100px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  text-align: center;
+  color: #ffffff;
+  animation: scaleUp 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.follow-modal-card h2 {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  background: linear-gradient(135deg, #ffffff 0%, #a5a5a5 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 0;
+}
+
+.follow-modal-card p {
+  font-size: 14px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.6);
+  line-height: 1.5;
+  margin: 0 0 10px 0;
+}
+
+.social-links-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.social-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border-radius: 16px;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 700;
+  color: #ffffff;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.social-link-btn i {
+  font-size: 18px;
+}
+
+.social-link-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0,0,0,0.35);
+  filter: brightness(1.15);
+}
+
+.social-link-btn:active {
+  transform: translateY(0);
+}
+
+/* Specific Social Brand Gradients */
+.social-link-btn.tiktok {
+  background: linear-gradient(135deg, #000000 0%, #1e1e1e 100%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+.social-link-btn.tiktok:hover {
+  box-shadow: 0 8px 25px rgba(254, 44, 85, 0.35), 0 0 0 1px rgba(37, 244, 238, 0.4);
+}
+
+.social-link-btn.youtube {
+  background: linear-gradient(135deg, #ff0000 0%, #b30000 100%);
+}
+.social-link-btn.youtube:hover {
+  box-shadow: 0 8px 25px rgba(255, 0, 0, 0.3);
+}
+
+.social-link-btn.soundcloud {
+  background: linear-gradient(135deg, #ff5500 0%, #ff2200 100%);
+}
+.social-link-btn.soundcloud:hover {
+  box-shadow: 0 8px 25px rgba(255, 85, 0, 0.35);
+}
+
+/* Dismiss / Start button */
+.start-player-btn {
+  background: #ffffff;
+  color: #000000;
+  border: none;
+  border-radius: 16px;
+  padding: 14px 20px;
+  font-size: 14.5px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  margin-top: 10px;
+  box-shadow: 0 10px 25px rgba(255,255,255,0.15);
+}
+
+.start-player-btn i {
+  transition: transform 0.2s ease;
+}
+
+.start-player-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 30px rgba(255,255,255,0.25);
+}
+
+.start-player-btn:hover i {
+  transform: translateX(4px);
+}
+
+.start-player-btn:active {
+  transform: translateY(0);
+}
