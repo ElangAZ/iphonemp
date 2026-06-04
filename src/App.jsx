@@ -38,6 +38,8 @@ function App() {
   const fileInputRef = useRef(null);
   const coverInputRef = useRef(null);
   const canvasRef = useRef(null);
+  const uiCanvasRef = useRef(null);
+  const analyserRef = useRef(null);
   const animationFrameRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const recordedChunksRef = useRef([]);
@@ -107,22 +109,30 @@ function App() {
       ctx.resume();
     }
 
+    // Initialize AnalyserNode
+    if (!analyserRef.current) {
+      analyserRef.current = ctx.createAnalyser();
+      analyserRef.current.fftSize = 512;
+    }
+
     if (isVideoType) {
       if (videoSourceRef.current) return; // Already connected!
       videoSourceRef.current = ctx.createMediaElementSource(element);
-      videoSourceRef.current.connect(ctx.destination);
+      videoSourceRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(ctx.destination);
       if (!audioDestinationRef.current) {
         audioDestinationRef.current = ctx.createMediaStreamDestination();
       }
-      videoSourceRef.current.connect(audioDestinationRef.current);
+      analyserRef.current.connect(audioDestinationRef.current);
     } else {
       if (audioSourceRef.current) return; // Already connected!
       audioSourceRef.current = ctx.createMediaElementSource(element);
-      audioSourceRef.current.connect(ctx.destination);
+      audioSourceRef.current.connect(analyserRef.current);
+      analyserRef.current.connect(ctx.destination);
       if (!audioDestinationRef.current) {
         audioDestinationRef.current = ctx.createMediaStreamDestination();
       }
-      audioSourceRef.current.connect(audioDestinationRef.current);
+      analyserRef.current.connect(audioDestinationRef.current);
     }
   };
 
@@ -139,6 +149,8 @@ function App() {
       if (audioContextRef.current && audioContextRef.current.state === 'suspended') {
         audioContextRef.current.resume();
       }
+      // Ensure Web Audio analyser is set up
+      setupWebAudio(player, isVideo);
       player.play().then(() => {
         setIsPlaying(true);
       }).catch(err => console.error("Playback failed:", err));
@@ -261,6 +273,7 @@ function App() {
   const startCanvasRenderLoop = (ctx, canvasWidth, canvasHeight, coverImgObj, isVideoActive, videoEl) => {
     let textScrollOffset = 0;
     let scrollPauseTicks = 0;
+    const videoSmoothHeights = new Array(6).fill(0);
     
     // Helper to draw image/video with object-fit: cover cropped-centering
     const drawMediaCover = (media, x, y, w, h, r, isVideoType) => {
@@ -424,6 +437,14 @@ function App() {
         ctx.restore();
       }
 
+      // 3.5. Audio Spectrum data preparation (drawn later next to song info)
+      let specDataArray = null;
+      if (analyserRef.current) {
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        specDataArray = new Uint8Array(bufferLength);
+        analyserRef.current.getByteFrequencyData(specDataArray);
+      }
+
       // 4. Song Info text (perfect luxurious spacing)
       const infoY = artY + artSize + 60;
       ctx.fillStyle = '#ffffff';
@@ -494,6 +515,54 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.font = '500 20px Inter';
       ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
+
+      // 4.5. Draw Spectrum on the right side (aligned with title + artist, bidirectional)
+      if (specDataArray && specDataArray.length > 0) {
+        const specBarCount = 6;
+        const specGap = 3;
+        const specHeight = 40;
+        const specBarWidth = 2.5;
+        const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
+        const specX = cardX + cardWidth - artPadding - specTotalWidth;
+        const specCenterY = infoY + 10;
+
+        for (let i = 0; i < specBarCount; i++) {
+          let val = 0;
+          if (i === 0) {
+            let bassSum = 0;
+            for (let b = 0; b <= 1; b++) bassSum += (specDataArray[b] || 0);
+            const bassAvg = bassSum / 2;
+            val = bassAvg > 195 ? (bassAvg - 195) * 3.5 : 0;
+          } else {
+            const freqBins = [20, 36, 56, 80, 110];
+            const dataIdx = freqBins[i - 1] || 20;
+            val = specDataArray[dataIdx] || 0;
+          }
+          
+          const normalized = Math.pow(val / 255, 1.8) * 0.65;
+          const targetHeight = normalized * (specHeight / 2);
+          
+          // Apply smooth delay/decay transition
+          if (targetHeight > videoSmoothHeights[i]) {
+            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 0.35;
+          } else {
+            videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * 0.22;
+          }
+          
+          const halfH = Math.max(1.5, videoSmoothHeights[i]);
+          const bx = specX + i * (specBarWidth + specGap);
+
+          ctx.beginPath();
+          ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+        }
+      }
 
       // 5. Seekbar
       const seekY = infoY + 80;
@@ -684,29 +753,14 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
       ctx.fill();
  
-      // AirPlay icon inside pill
+      // AirDrop icon inside pill (using Path2D)
       ctx.save();
       ctx.translate(pillX + 32 + 10, pillY + 26);
-      ctx.strokeStyle = '#ffffff';
+      ctx.scale(0.028, 0.028);
+      ctx.translate(-512, -512);
       ctx.fillStyle = '#ffffff';
-      ctx.lineWidth = 2.5;
- 
-      // AirPlay Triangle
-      ctx.beginPath();
-      ctx.moveTo(-10, 8);
-      ctx.lineTo(10, 8);
-      ctx.lineTo(0, -4);
-      ctx.closePath();
-      ctx.fill();
- 
-      // AirPlay Arcs
-      ctx.beginPath();
-      ctx.arc(0, -1, 10, Math.PI + 0.5, Math.PI * 2 - 0.5);
-      ctx.stroke();
- 
-      ctx.beginPath();
-      ctx.arc(0, -1, 16, Math.PI + 0.5, Math.PI * 2 - 0.5);
-      ctx.stroke();
+      const airdropPath = new Path2D("M938.666667 554.666667a426.666667 426.666667 0 0 1-109.653334 285.44 21.76 21.76 0 0 1-30.72 0l-15.36-15.36a21.76 21.76 0 0 1 0-29.013334 362.666667 362.666667 0 1 0-540.16 0 21.76 21.76 0 0 1 0 29.013334l-15.36 15.36a21.76 21.76 0 0 1-30.72 0A426.666667 426.666667 0 1 1 938.666667 554.666667zM512 256a298.666667 298.666667 0 0 0-226.986667 493.226667 23.893333 23.893333 0 0 0 15.36 7.253333 23.04 23.04 0 0 0 16.213334-6.4l14.933333-14.933333a21.333333 21.333333 0 0 0 0-29.013334 234.666667 234.666667 0 1 1 358.4 0 21.333333 21.333333 0 0 0 0 29.013334l14.933333 14.933333a23.04 23.04 0 0 0 16.213334 6.4 23.893333 23.893333 0 0 0 15.36-7.253333A298.666667 298.666667 0 0 0 512 256z m85.333333 360.533333a21.333333 21.333333 0 0 0 2.133334 27.306667l15.36 15.36a21.333333 21.333333 0 0 0 16.64 5.973333 20.053333 20.053333 0 0 0 15.36-8.533333 170.666667 170.666667 0 1 0-273.066667 0 20.053333 20.053333 0 0 0 15.36 8.533333 21.333333 21.333333 0 0 0 16.64-5.973333l15.36-15.36a21.333333 21.333333 0 0 0 2.133333-27.306667 106.666667 106.666667 0 1 1 174.08 0zM469.333333 554.666667a42.666667 42.666667 0 1 0 42.666667-42.666667 42.666667 42.666667 0 0 0-42.666667 42.666667z m74.666667 137.386666a32 32 0 0 0-22.613333-9.386666h-18.773334a32 32 0 0 0-22.613333 9.386666l-159.146667 158.72a21.76 21.76 0 0 0 0 30.293334l8.96 8.533333a20.053333 20.053333 0 0 0 14.933334 6.4h334.08a20.053333 20.053333 0 0 0 14.933333-6.4l8.96-8.533333a21.333333 21.333333 0 0 0 0-30.293334z");
+      ctx.fill(airdropPath);
       ctx.restore();
  
       // Pill Text (dynamic deviceName)
@@ -1115,6 +1169,96 @@ function App() {
     };
   }, [isVideo]);
 
+  // Live UI Visualizer Loop
+  useEffect(() => {
+    let animationFrameId;
+    const canvas = uiCanvasRef.current;
+    if (!canvas) return;
+
+    const resizeCanvas = () => {
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * (window.devicePixelRatio || 1);
+      canvas.height = rect.height * (window.devicePixelRatio || 1);
+    };
+    resizeCanvas();
+    
+    const observer = new ResizeObserver(() => resizeCanvas());
+    observer.observe(canvas);
+
+    const ctx = canvas.getContext('2d');
+    const barCount = 6;
+    const gap = 2;
+    const smoothHeights = new Array(barCount).fill(0);
+
+    const draw = () => {
+      if (!ctx || !canvas) return;
+      const width = canvas.width;
+      const height = canvas.height;
+      const centerY = height / 2;
+      ctx.clearRect(0, 0, width, height);
+
+      let dataArray = new Uint8Array(0);
+      if (analyserRef.current && isPlaying) {
+        const bufferLength = analyserRef.current.frequencyBinCount;
+        dataArray = new Uint8Array(bufferLength);
+        analyserRef.current.getByteFrequencyData(dataArray);
+      }
+
+      const barWidth = 2;
+      const totalWidth = barCount * barWidth + (barCount - 1) * gap;
+      const offsetX = (width - totalWidth) / 2;
+      
+      for (let i = 0; i < barCount; i++) {
+        let val = 0;
+        if (dataArray.length > 0) {
+          if (i === 0) {
+            // Leftmost bar: kick/bass only (bins 0-1, sub-bass ~0-172Hz with high fftSize)
+            let bassSum = 0;
+            for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
+            const bassAvg = bassSum / 2;
+            // Very high threshold: only real kick hits
+            val = bassAvg > 195 ? (bassAvg - 195) * 3.5 : 0;
+          } else {
+            // Bars 2-6: mapped to specific active frequency bands
+            const freqBins = [20, 36, 56, 80, 110];
+            const dataIdx = freqBins[i - 1] || 20;
+            val = dataArray[dataIdx] || 0;
+          }
+        }
+
+        const normalized = Math.pow(val / 255, 1.8) * 0.65;
+        const targetHeight = normalized * height;
+        if (targetHeight > smoothHeights[i]) {
+          smoothHeights[i] += (targetHeight - smoothHeights[i]) * 0.35; // Kecepatan naik
+        } else {
+          smoothHeights[i] -= (smoothHeights[i] - targetHeight) * 0.22; // Kecepatan turun (makin besar = makin cepat turun)
+        }
+
+        const halfH = Math.max(1, smoothHeights[i] / 2);
+        const x = offsetX + i * (barWidth + gap);
+
+        ctx.beginPath();
+        ctx.roundRect(x, centerY - halfH, barWidth, halfH, 0.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.roundRect(x, centerY, barWidth, halfH, 0.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fill();
+      }
+
+      animationFrameId = requestAnimationFrame(draw);
+    };
+
+    draw();
+
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
+    };
+  }, [isPlaying]);
+
   return (
     <>
       {/* Blurred cover art background on the viewport */}
@@ -1353,6 +1497,8 @@ function App() {
                 </div>
               )}
             </div>
+            {/* Live visualizer spectrum bars - right side aligned with title/artist */}
+            <canvas ref={uiCanvasRef} className="ui-visualizer" />
           </div>
 
           {/* Progress Seekbar */}
@@ -1435,9 +1581,8 @@ function App() {
                 onClick={() => setIsEditingDevice(true)} 
                 title="Klik untuk ganti nama device"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <polygon points="12 12 17 21 7 21 12 12" fill="currentColor" stroke="none" />
-                  <path d="M18.36 10.64a9 9 0 0 0-12.72 0M15.54 13.46a5 5 0 0 0-7.08 0" stroke="currentColor" strokeWidth="2" fill="none" />
+                <svg viewBox="0 0 1024 1024" fill="currentColor">
+                  <path d="M938.666667 554.666667a426.666667 426.666667 0 0 1-109.653334 285.44 21.76 21.76 0 0 1-30.72 0l-15.36-15.36a21.76 21.76 0 0 1 0-29.013334 362.666667 362.666667 0 1 0-540.16 0 21.76 21.76 0 0 1 0 29.013334l-15.36 15.36a21.76 21.76 0 0 1-30.72 0A426.666667 426.666667 0 1 1 938.666667 554.666667zM512 256a298.666667 298.666667 0 0 0-226.986667 493.226667 23.893333 23.893333 0 0 0 15.36 7.253333 23.04 23.04 0 0 0 16.213334-6.4l14.933333-14.933333a21.333333 21.333333 0 0 0 0-29.013334 234.666667 234.666667 0 1 1 358.4 0 21.333333 21.333333 0 0 0 0 29.013334l14.933333 14.933333a23.04 23.04 0 0 0 16.213334 6.4 23.893333 23.893333 0 0 0 15.36-7.253333A298.666667 298.666667 0 0 0 512 256z m85.333333 360.533333a21.333333 21.333333 0 0 0 2.133334 27.306667l15.36 15.36a21.333333 21.333333 0 0 0 16.64 5.973333 20.053333 20.053333 0 0 0 15.36-8.533333 170.666667 170.666667 0 1 0-273.066667 0 20.053333 20.053333 0 0 0 15.36 8.533333 21.333333 21.333333 0 0 0 16.64-5.973333l15.36-15.36a21.333333 21.333333 0 0 0 2.133333-27.306667 106.666667 106.666667 0 1 1 174.08 0zM469.333333 554.666667a42.666667 42.666667 0 1 0 42.666667-42.666667 42.666667 42.666667 0 0 0-42.666667 42.666667z m74.666667 137.386666a32 32 0 0 0-22.613333-9.386666h-18.773334a32 32 0 0 0-22.613333 9.386666l-159.146667 158.72a21.76 21.76 0 0 0 0 30.293334l8.96 8.533333a20.053333 20.053333 0 0 0 14.933334 6.4h334.08a20.053333 20.053333 0 0 0 14.933333-6.4l8.96-8.533333a21.333333 21.333333 0 0 0 0-30.293334z" />
                 </svg>
                 <span>{deviceName}</span>
               </button>
