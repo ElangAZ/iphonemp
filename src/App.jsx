@@ -274,7 +274,6 @@ function App() {
     let textScrollOffset = 0;
     let scrollPauseTicks = 0;
     const videoSmoothHeights = new Array(6).fill(0);
-    let rollingBass = 150;
     
     // Helper to draw image/video with object-fit: cover cropped-centering
     const drawMediaCover = (media, x, y, w, h, r, isVideoType) => {
@@ -533,9 +532,8 @@ function App() {
             let bassSum = 0;
             for (let b = 0; b <= 1; b++) bassSum += (specDataArray[b] || 0);
             const bassAvg = bassSum / 2;
-            rollingBass = rollingBass * 0.98 + bassAvg * 0.02;
-            const threshold = Math.max(120, rollingBass * 1.12);
-            val = bassAvg > threshold ? (bassAvg - threshold) * 2.2 : 0;
+            // Low threshold (145) to trigger easily, low multiplier (1.6) so it never hits max height
+            val = bassAvg > 145 ? (bassAvg - 145) * 1.6 : 0;
           } else {
             const freqBins = [20, 36, 56, 80, 110];
             const dataIdx = freqBins[i - 1] || 20;
@@ -1193,7 +1191,6 @@ function App() {
     const barCount = 6;
     const gap = 2;
     const smoothHeights = new Array(barCount).fill(0);
-    let rollingBass = 150;
 
     const draw = () => {
       if (!ctx || !canvas) return;
@@ -1221,9 +1218,8 @@ function App() {
             let bassSum = 0;
             for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
             const bassAvg = bassSum / 2;
-            rollingBass = rollingBass * 0.98 + bassAvg * 0.02;
-            const threshold = Math.max(120, rollingBass * 1.12);
-            val = bassAvg > threshold ? (bassAvg - threshold) * 2.2 : 0;
+            // Low threshold (145) to trigger easily, low multiplier (1.6) so it never hits max height
+            val = bassAvg > 145 ? (bassAvg - 145) * 1.6 : 0;
           } else {
             // Bars 2-6: mapped to specific active frequency bands
             const freqBins = [20, 36, 56, 80, 110];
