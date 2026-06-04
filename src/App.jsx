@@ -274,6 +274,7 @@ function App() {
     let textScrollOffset = 0;
     let scrollPauseTicks = 0;
     const videoSmoothHeights = new Array(6).fill(0);
+    let rollingBass = 150;
     
     // Helper to draw image/video with object-fit: cover cropped-centering
     const drawMediaCover = (media, x, y, w, h, r, isVideoType) => {
@@ -532,7 +533,9 @@ function App() {
             let bassSum = 0;
             for (let b = 0; b <= 1; b++) bassSum += (specDataArray[b] || 0);
             const bassAvg = bassSum / 2;
-            val = bassAvg > 195 ? (bassAvg - 195) * 3.5 : 0;
+            rollingBass = rollingBass * 0.98 + bassAvg * 0.02;
+            const threshold = Math.max(120, rollingBass * 1.12);
+            val = bassAvg > threshold ? (bassAvg - threshold) * 2.2 : 0;
           } else {
             const freqBins = [20, 36, 56, 80, 110];
             const dataIdx = freqBins[i - 1] || 20;
@@ -542,11 +545,12 @@ function App() {
           const normalized = Math.pow(val / 255, 1.8) * 0.65;
           const targetHeight = normalized * (specHeight / 2);
           
-          // Apply smooth delay/decay transition
+          // Apply smooth delay/decay transition (slower decay for the kick bar)
+          const decayRate = i === 0 ? 0.08 : 0.22;
           if (targetHeight > videoSmoothHeights[i]) {
             videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 0.35;
           } else {
-            videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * 0.22;
+            videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
           }
           
           const halfH = Math.max(1.5, videoSmoothHeights[i]);
@@ -1189,6 +1193,7 @@ function App() {
     const barCount = 6;
     const gap = 2;
     const smoothHeights = new Array(barCount).fill(0);
+    let rollingBass = 150;
 
     const draw = () => {
       if (!ctx || !canvas) return;
@@ -1216,8 +1221,9 @@ function App() {
             let bassSum = 0;
             for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
             const bassAvg = bassSum / 2;
-            // Very high threshold: only real kick hits
-            val = bassAvg > 195 ? (bassAvg - 195) * 3.5 : 0;
+            rollingBass = rollingBass * 0.98 + bassAvg * 0.02;
+            const threshold = Math.max(120, rollingBass * 1.12);
+            val = bassAvg > threshold ? (bassAvg - threshold) * 2.2 : 0;
           } else {
             // Bars 2-6: mapped to specific active frequency bands
             const freqBins = [20, 36, 56, 80, 110];
@@ -1228,10 +1234,13 @@ function App() {
 
         const normalized = Math.pow(val / 255, 1.8) * 0.65;
         const targetHeight = normalized * height;
+        
+        // Slower decay for the kick bar to avoid dropping too instantly
+        const decayRate = i === 0 ? 0.08 : 0.22;
         if (targetHeight > smoothHeights[i]) {
           smoothHeights[i] += (targetHeight - smoothHeights[i]) * 0.35; // Kecepatan naik
         } else {
-          smoothHeights[i] -= (smoothHeights[i] - targetHeight) * 0.22; // Kecepatan turun (makin besar = makin cepat turun)
+          smoothHeights[i] -= (smoothHeights[i] - targetHeight) * decayRate; // Kecepatan turun
         }
 
         const halfH = Math.max(1, smoothHeights[i] / 2);
