@@ -543,10 +543,10 @@ function App() {
           const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
           const targetHeight = normalized * (specHeight / 2);
           
-          // Apply smooth delay/decay transition (slower decay for the kick bar)
-          const decayRate = i === 0 ? 0.08 : 0.22;
+          // Apply fast rise and decay
+          const decayRate = 0.35;
           if (targetHeight > videoSmoothHeights[i]) {
-            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 0.35;
+            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 0.75;
           } else {
             videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
           }
@@ -1231,10 +1231,10 @@ function App() {
         const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
         const targetHeight = normalized * height;
         
-        // Slower decay for the kick bar to avoid dropping too instantly
-        const decayRate = i === 0 ? 0.08 : 0.22;
+        // Apply fast rise and decay
+        const decayRate = 0.35;
         if (targetHeight > smoothHeights[i]) {
-          smoothHeights[i] += (targetHeight - smoothHeights[i]) * 0.35; // Kecepatan naik
+          smoothHeights[i] += (targetHeight - smoothHeights[i]) * 0.75; // Kecepatan naik
         } else {
           smoothHeights[i] -= (smoothHeights[i] - targetHeight) * decayRate; // Kecepatan turun
         }
