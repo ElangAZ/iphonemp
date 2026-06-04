@@ -540,7 +540,7 @@ function App() {
             val = specDataArray[dataIdx] || 0;
           }
           
-          const normalized = Math.pow(val / 255, 1.8) * 0.65;
+          const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
           const targetHeight = normalized * (specHeight / 2);
           
           // Apply smooth delay/decay transition (slower decay for the kick bar)
@@ -1228,7 +1228,7 @@ function App() {
           }
         }
 
-        const normalized = Math.pow(val / 255, 1.8) * 0.65;
+        const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
         const targetHeight = normalized * height;
         
         // Slower decay for the kick bar to avoid dropping too instantly
