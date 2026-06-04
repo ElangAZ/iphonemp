@@ -543,10 +543,10 @@ function App() {
           const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
           const targetHeight = normalized * (specHeight / 2);
           
-          // Apply fast rise and decay
-          const decayRate = 0.35;
+          // Apply fast rise and decay (instant rise, extremely fast decay)
+          const decayRate = 0.75;
           if (targetHeight > videoSmoothHeights[i]) {
-            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 0.75;
+            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0;
           } else {
             videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
           }
@@ -1231,10 +1231,10 @@ function App() {
         const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
         const targetHeight = normalized * height;
         
-        // Apply fast rise and decay
-        const decayRate = 0.35;
+        // Apply fast rise and decay (instant rise, extremely fast decay)
+        const decayRate = 0.75;
         if (targetHeight > smoothHeights[i]) {
-          smoothHeights[i] += (targetHeight - smoothHeights[i]) * 0.75; // Kecepatan naik
+          smoothHeights[i] += (targetHeight - smoothHeights[i]) * 1.0; // Kecepatan naik
         } else {
           smoothHeights[i] -= (smoothHeights[i] - targetHeight) * decayRate; // Kecepatan turun
         }
