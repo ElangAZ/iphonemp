@@ -72,24 +72,6 @@ function App() {
     audioFadeDurationRef.current = audioFadeDuration;
   }, [isRecording, renderStart, renderEnd, isAudioFadeEnabled, audioFadeDuration]);
 
-  const volumeIconRef = useRef(null);
-
-  useEffect(() => {
-    const img = new Image();
-    img.src = '/volume-high.png';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = 24;
-      canvas.height = 24;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, 24, 24);
-      ctx.globalCompositeOperation = 'source-in';
-      ctx.fillStyle = '#ffffff';
-      ctx.fillRect(0, 0, 24, 24);
-      volumeIconRef.current = canvas;
-    };
-  }, []);
-
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
@@ -805,45 +787,40 @@ function App() {
 
       // Right high-volume speaker icon with waves (Scaled up by 1.8x)
       ctx.save();
-      if (volumeIconRef.current) {
-        ctx.translate(volX + volWidth + 14, volY - 16.6);
-        ctx.scale(1.8, 1.8);
-        ctx.globalAlpha = 0.45;
-        ctx.drawImage(volumeIconRef.current, 0, 0, 24, 24);
-      } else {
-        ctx.translate(volX + volWidth + 14, volY - 16.6);
-        ctx.scale(1.8, 1.8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.lineWidth = 1.8;
-        ctx.lineCap = 'round';
-        
-        // Speaker body
-        ctx.beginPath();
-        ctx.moveTo(9, 6);
-        ctx.lineTo(5, 9);
-        ctx.lineTo(2, 9);
-        ctx.lineTo(2, 15);
-        ctx.lineTo(5, 15);
-        ctx.lineTo(9, 18);
-        ctx.closePath();
-        ctx.fill();
+      ctx.translate(volX + volWidth + 14, volY - 16.6);
+      ctx.scale(1.8, 1.8);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 1.8;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // Speaker body
+      ctx.beginPath();
+      ctx.moveTo(9, 6);
+      ctx.lineTo(5, 9);
+      ctx.lineTo(2, 9);
+      ctx.lineTo(2, 15);
+      ctx.lineTo(5, 15);
+      ctx.lineTo(9, 18);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-        // Wave Arc 1
-        ctx.beginPath();
-        ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
+      // Wave Arc 1
+      ctx.beginPath();
+      ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
 
-        // Wave Arc 2
-        ctx.beginPath();
-        ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
+      // Wave Arc 2
+      ctx.beginPath();
+      ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
 
-        // Wave Arc 3
-        ctx.beginPath();
-        ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
-      }
+      // Wave Arc 3
+      ctx.beginPath();
+      ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
+      ctx.stroke();
       ctx.restore();
       
       // 8. Device selector pill button at the bottom center (Dynamic centering & width based on custom name)
@@ -871,25 +848,25 @@ function App() {
       ctx.lineCap = 'round';
       ctx.translate(-12, -12);
 
-      // Triangle base: points (12, 17), (6, 23), (18, 23)
+      // Triangle base: points (12, 12), (5.5, 20.5), (18.5, 20.5)
       ctx.beginPath();
-      ctx.moveTo(12, 17);
-      ctx.lineTo(6, 23);
-      ctx.lineTo(18, 23);
+      ctx.moveTo(12, 12);
+      ctx.lineTo(5.5, 20.5);
+      ctx.lineTo(18.5, 20.5);
       ctx.closePath();
       ctx.fill();
 
-      // Concentric arcs (center 12, 14)
+      // Concentric arcs (center 12, 12, start angle 0.8 * PI, end angle 0.2 * PI clockwise)
       ctx.beginPath();
-      ctx.arc(12, 14, 5, 0.8 * Math.PI, 0.2 * Math.PI);
+      ctx.arc(12, 12, 5, 0.8 * Math.PI, 0.2 * Math.PI);
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(12, 14, 8, 0.8 * Math.PI, 0.2 * Math.PI);
+      ctx.arc(12, 12, 9, 0.8 * Math.PI, 0.2 * Math.PI);
       ctx.stroke();
 
       ctx.beginPath();
-      ctx.arc(12, 14, 11, 0.8 * Math.PI, 0.2 * Math.PI);
+      ctx.arc(12, 12, 13, 0.8 * Math.PI, 0.2 * Math.PI);
       ctx.stroke();
       ctx.restore();
  
@@ -1419,37 +1396,32 @@ function App() {
         ctx.fill();
 
         ctx.save();
-        if (volumeIconRef.current) {
-          ctx.translate(volX + volWidth + 14, volY - 16.6);
-          ctx.scale(1.8, 1.8);
-          ctx.globalAlpha = 0.45;
-          ctx.drawImage(volumeIconRef.current, 0, 0, 24, 24);
-        } else {
-          ctx.translate(volX + volWidth + 14, volY - 16.6);
-          ctx.scale(1.8, 1.8);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-          ctx.lineWidth = 1.8;
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          ctx.moveTo(9, 6);
-          ctx.lineTo(5, 9);
-          ctx.lineTo(2, 9);
-          ctx.lineTo(2, 15);
-          ctx.lineTo(5, 15);
-          ctx.lineTo(9, 18);
-          ctx.closePath();
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
-          ctx.stroke();
-        }
+        ctx.translate(volX + volWidth + 14, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(9, 6);
+        ctx.lineTo(5, 9);
+        ctx.lineTo(2, 9);
+        ctx.lineTo(2, 15);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(9, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
         ctx.restore();
 
         // Device Selector Pill
@@ -1474,25 +1446,25 @@ function App() {
         ctx.lineCap = 'round';
         ctx.translate(-12, -12);
 
-        // Triangle base: points (12, 17), (6, 23), (18, 23)
+        // Triangle base: points (12, 12), (5.5, 20.5), (18.5, 20.5)
         ctx.beginPath();
-        ctx.moveTo(12, 17);
-        ctx.lineTo(6, 23);
-        ctx.lineTo(18, 23);
+        ctx.moveTo(12, 12);
+        ctx.lineTo(5.5, 20.5);
+        ctx.lineTo(18.5, 20.5);
         ctx.closePath();
         ctx.fill();
 
-        // Concentric arcs (center 12, 14)
+        // Concentric arcs (center 12, 12, start angle 0.8 * PI, end angle 0.2 * PI clockwise)
         ctx.beginPath();
-        ctx.arc(12, 14, 5, 0.8 * Math.PI, 0.2 * Math.PI);
+        ctx.arc(12, 12, 5, 0.8 * Math.PI, 0.2 * Math.PI);
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(12, 14, 8, 0.8 * Math.PI, 0.2 * Math.PI);
+        ctx.arc(12, 12, 9, 0.8 * Math.PI, 0.2 * Math.PI);
         ctx.stroke();
 
         ctx.beginPath();
-        ctx.arc(12, 14, 11, 0.8 * Math.PI, 0.2 * Math.PI);
+        ctx.arc(12, 12, 13, 0.8 * Math.PI, 0.2 * Math.PI);
         ctx.stroke();
         ctx.restore();
 
@@ -2324,12 +2296,12 @@ function App() {
             <div className="volume-track" onClick={handleVolumeChange}>
               <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
             </div>
-            <img 
-              className="volume-icon" 
-              src="/volume-high.png" 
-              alt="volume" 
-              style={{ opacity: 0.45, filter: 'brightness(0) invert(1)' }} 
-            />
+            <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 5 L6 9 H2v6h4l5 4V5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
+              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M22.6 1.4a15 15 0 0 1 0 21.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+            </svg>
           </div>
 
           {/* Bottom Device Selector Pill */}
@@ -2363,10 +2335,10 @@ function App() {
                 title="Klik untuk ganti nama device"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ fill: 'none' }}>
-                  <path d="M 7.95 16.94 A 5 5 0 1 1 16.05 16.94" />
-                  <path d="M 5.53 18.7 A 8 8 0 1 1 18.47 18.7" />
-                  <path d="M 3.1 20.47 A 11 11 0 1 1 20.9 20.47" />
-                  <polygon points="12 17 6 23 18 23" fill="currentColor" stroke="none" />
+                  <path d="M9.1 16 A 5 5 0 1 1 14.9 16" />
+                  <path d="M6.7 19.2 A 9 9 0 1 1 17.3 19.2" />
+                  <path d="M4.3 22.4 A 13 13 0 1 1 19.7 22.4" />
+                  <polygon points="12 12 5.5 20.5 18.5 20.5" fill="currentColor" stroke="none" />
                 </svg>
                 <span>{deviceName}</span>
               </button>
