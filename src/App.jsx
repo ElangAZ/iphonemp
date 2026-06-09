@@ -2294,9 +2294,9 @@ function App() {
             </div>
             <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
               <path d="M11 5 L6 9 H2v6h4l5 4V5z" />
-              <path d="M 11.5 7.67 A 5 5 0 0 1 11.5 16.33" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M 13.5 4.21 A 9 9 0 0 1 13.5 19.79" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M 15.5 0.74 A 13 13 0 0 1 15.5 23.26" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M 11.5 7.67 A 5 5 0 0 1 11.5 16.33" fill="none" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M 13.5 4.21 A 9 9 0 0 1 13.5 19.79" fill="none" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M 15.5 0.74 A 13 13 0 0 1 15.5 23.26" fill="none" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
             </svg>
           </div>
 
