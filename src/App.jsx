@@ -655,8 +655,8 @@ function App() {
       ctx.beginPath();
       // Draw a 5-pointed star
       const spikes = 5;
-      const outerRadius = 16;
-      const innerRadius = 7.5;
+      const outerRadius = 22;
+      const innerRadius = 10;
       let rot = Math.PI / 2 * 3;
       const step = Math.PI / spikes;
       ctx.moveTo(0, -outerRadius);
@@ -1263,9 +1263,9 @@ function App() {
         ctx.lineCap = 'round';
         ctx.beginPath();
         // Draw a 5-pointed star
-        const spikes = 5;
-        const outerRadius = 16;
-        const innerRadius = 7.5;
+         const spikes = 5;
+         const outerRadius = 22;
+         const innerRadius = 10;
         let rot = Math.PI / 2 * 3;
         const step = Math.PI / spikes;
         ctx.moveTo(0, -outerRadius);
@@ -2151,7 +2151,23 @@ function App() {
           </div>
 
           {/* Player controls */}
-          <div className="controls">
+          <div className="controls" style={{ position: 'relative' }}>
+            {/* Star Outline - Positioned on the left */}
+            <button className="ctrl-btn small star-btn" style={{ position: 'absolute', left: '32px', opacity: 0.55 }}>
+              <svg 
+                viewBox="0 0 24 24" 
+                width="28" 
+                height="28" 
+                fill="none" 
+                stroke="white" 
+                strokeWidth="2.2" 
+                strokeLinecap="round" 
+                strokeLinejoin="round"
+              >
+                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+              </svg>
+            </button>
+
             {/* Middle Playback buttons - centered without star */}
             <div className="control-center">
               <button className="ctrl-btn small">
