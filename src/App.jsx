@@ -56,6 +56,18 @@ function App() {
 
   const titleRef = useRef(null);
   const containerRef = useRef(null);
+  const airplayImgRef = useRef(null);
+  const volumeHighImgRef = useRef(null);
+
+  useEffect(() => {
+    const airplay = new Image();
+    airplay.src = '/airplay.png';
+    airplayImgRef.current = airplay;
+
+    const vol = new Image();
+    vol.src = '/volume-high.png';
+    volumeHighImgRef.current = vol;
+  }, []);
 
   const isRecordingRef = useRef(isRecording);
   const renderStartRef = useRef(renderStart);
@@ -785,43 +797,17 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.fill();
 
-      // Right high-volume speaker icon with waves (Scaled up by 1.8x)
-      ctx.save();
-      ctx.translate(volX + volWidth + 14, volY - 16.6);
-      ctx.scale(1.8, 1.8);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.lineWidth = 1.8;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      
-      // Speaker body
-      ctx.beginPath();
-      ctx.moveTo(9, 6);
-      ctx.lineTo(5, 9);
-      ctx.lineTo(2, 9);
-      ctx.lineTo(2, 15);
-      ctx.lineTo(5, 15);
-      ctx.lineTo(9, 18);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Wave Arc 1
-      ctx.beginPath();
-      ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
-      ctx.stroke();
-
-      // Wave Arc 2
-      ctx.beginPath();
-      ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
-      ctx.stroke();
-
-      // Wave Arc 3
-      ctx.beginPath();
-      ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
-      ctx.stroke();
-      ctx.restore();
+      // Right high-volume speaker icon (Scaled up by 1.8x)
+      if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+        ctx.save();
+        ctx.translate(volX + volWidth + 14, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.globalAlpha = 0.45;
+        const img = volumeHighImgRef.current;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        ctx.drawImage(img, 0, 0, 24 * ratio, 24);
+        ctx.restore();
+      }
       
       // 8. Device selector pill button at the bottom center (Dynamic centering & width based on custom name)
       ctx.font = '600 22px Inter';
@@ -839,36 +825,16 @@ function App() {
       ctx.fill();
  
       // AirPlay Audio icon inside pill
-      ctx.save();
-      ctx.translate(pillX + 32 + 10, pillY + 26);
-      ctx.scale(1.2, 1.2);
-      ctx.strokeStyle = '#ffffff';
-      ctx.fillStyle = '#ffffff';
-      ctx.lineWidth = 1.8;
-      ctx.lineCap = 'round';
-      ctx.translate(-12, -12);
-
-      // Triangle base: points (12, 12), (5.5, 20.5), (18.5, 20.5)
-      ctx.beginPath();
-      ctx.moveTo(12, 12);
-      ctx.lineTo(5.5, 20.5);
-      ctx.lineTo(18.5, 20.5);
-      ctx.closePath();
-      ctx.fill();
-
-      // Concentric arcs (center 12, 12, start angle 0.8 * PI, end angle 0.2 * PI clockwise)
-      ctx.beginPath();
-      ctx.arc(12, 12, 5, 0.8 * Math.PI, 0.2 * Math.PI);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(12, 12, 9, 0.8 * Math.PI, 0.2 * Math.PI);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(12, 12, 13, 0.8 * Math.PI, 0.2 * Math.PI);
-      ctx.stroke();
-      ctx.restore();
+      if (airplayImgRef.current && airplayImgRef.current.complete) {
+        ctx.save();
+        ctx.translate(pillX + 32 + 10, pillY + 26);
+        ctx.scale(1.2, 1.2);
+        ctx.globalAlpha = 1.0;
+        const img = airplayImgRef.current;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        ctx.drawImage(img, -12 * ratio, -12, 24 * ratio, 24);
+        ctx.restore();
+      }
  
       // Pill Text (dynamic deviceName)
       ctx.fillStyle = '#ffffff';
@@ -1395,34 +1361,17 @@ function App() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
         ctx.fill();
 
-        ctx.save();
-        ctx.translate(volX + volWidth + 14, volY - 16.6);
-        ctx.scale(1.8, 1.8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.lineWidth = 1.8;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(9, 6);
-        ctx.lineTo(5, 9);
-        ctx.lineTo(2, 9);
-        ctx.lineTo(2, 15);
-        ctx.lineTo(5, 15);
-        ctx.lineTo(9, 18);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
-        ctx.restore();
+        // Right high-volume speaker icon (Scaled up by 1.8x)
+        if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+          ctx.save();
+          ctx.translate(volX + volWidth + 14, volY - 16.6);
+          ctx.scale(1.8, 1.8);
+          ctx.globalAlpha = 0.45;
+          const img = volumeHighImgRef.current;
+          const ratio = img.naturalWidth / img.naturalHeight;
+          ctx.drawImage(img, 0, 0, 24 * ratio, 24);
+          ctx.restore();
+        }
 
         // Device Selector Pill
         ctx.font = '600 22px Inter';
@@ -1437,36 +1386,16 @@ function App() {
         ctx.fill();
 
         // AirPlay Audio icon inside pill
-        ctx.save();
-        ctx.translate(pillX + 32 + 10, pillY + 26);
-        ctx.scale(1.2, 1.2);
-        ctx.strokeStyle = '#ffffff';
-        ctx.fillStyle = '#ffffff';
-        ctx.lineWidth = 1.8;
-        ctx.lineCap = 'round';
-        ctx.translate(-12, -12);
-
-        // Triangle base: points (12, 12), (5.5, 20.5), (18.5, 20.5)
-        ctx.beginPath();
-        ctx.moveTo(12, 12);
-        ctx.lineTo(5.5, 20.5);
-        ctx.lineTo(18.5, 20.5);
-        ctx.closePath();
-        ctx.fill();
-
-        // Concentric arcs (center 12, 12, start angle 0.8 * PI, end angle 0.2 * PI clockwise)
-        ctx.beginPath();
-        ctx.arc(12, 12, 5, 0.8 * Math.PI, 0.2 * Math.PI);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(12, 12, 9, 0.8 * Math.PI, 0.2 * Math.PI);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.arc(12, 12, 13, 0.8 * Math.PI, 0.2 * Math.PI);
-        ctx.stroke();
-        ctx.restore();
+        if (airplayImgRef.current && airplayImgRef.current.complete) {
+          ctx.save();
+          ctx.translate(pillX + 32 + 10, pillY + 26);
+          ctx.scale(1.2, 1.2);
+          ctx.globalAlpha = 1.0;
+          const img = airplayImgRef.current;
+          const ratio = img.naturalWidth / img.naturalHeight;
+          ctx.drawImage(img, -12 * ratio, -12, 24 * ratio, 24);
+          ctx.restore();
+        }
 
         ctx.fillStyle = '#ffffff';
         ctx.font = '600 22px Inter';
