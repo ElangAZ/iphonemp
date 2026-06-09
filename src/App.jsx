@@ -1483,10 +1483,7 @@ function App() {
         const cacheDir = (Directory && Directory.Cache) ? Directory.Cache : 'CACHE';
         
         const videoFilename = 'temp_input.webm';
-        const originalName = songFileRef.current ? songFileRef.current.name : 'temp_audio.mp3';
-        const lastDotIdx = originalName.lastIndexOf('.');
-        const audioExt = lastDotIdx !== -1 ? originalName.substring(lastDotIdx) : '.mp3';
-        const audioFilename = `temp_audio${audioExt}`;
+        const audioFilename = 'temp_audio.wav';
 
         // Clean up
         try { await Filesystem.deleteFile({ path: videoFilename, directory: cacheDir }); } catch (e) {}
@@ -1509,14 +1506,21 @@ function App() {
         });
         setConvertProgress(40);
 
-        // Write uploaded audio
-        setRenderError('Menyalin audio asli ke penyimpanan native...');
-        const audioBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(songFileRef.current);
-        });
+        // Render the faded, clipped WAV audio in Javascript
+        setRenderError('Memproses efek volume fade in/out...');
+        const fadedAudioBuffer = await renderFadedAudio(
+          decodedBuffer,
+          start,
+          end,
+          volume,
+          isAudioFadeEnabled,
+          parseFloat(audioFadeDuration) || 1.0
+        );
+        const wavBuffer = bufferToWav(fadedAudioBuffer);
+        const audioBase64 = await arrayBufferToBase64(wavBuffer);
+
+        // Write processed WAV audio to native filesystem
+        setRenderError('Menyimpan audio hasil pemrosesan...');
         await Filesystem.writeFile({
           path: audioFilename,
           data: audioBase64,
@@ -1542,8 +1546,8 @@ function App() {
         const transcodeResult = await VideoTranscoder.transcode({
           videoPath: videoUriResult.uri,
           audioPath: audioUriResult.uri,
-          audioStartMs: Math.round(start * 1000),
-          audioEndMs: Math.round(end * 1000),
+          audioStartMs: 0, // Already clipped!
+          audioEndMs: Math.round((end - start) * 1000), // Mux full duration of wav
           outputPath: outputUriResult.uri
         });
 
@@ -2473,6 +2477,108 @@ function App() {
       <audio ref={audioRef} style={{ display: 'none' }} />
     </>
   );
+}
+
+// Helper: Render faded and clipped audio via OfflineAudioContext
+async function renderFadedAudio(decodedBuffer, start, end, volume, isFadeEnabled, fadeDuration) {
+  const duration = end - start;
+  const sampleRate = decodedBuffer.sampleRate;
+  
+  const offlineCtx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(
+    decodedBuffer.numberOfChannels,
+    Math.floor(duration * sampleRate),
+    sampleRate
+  );
+  
+  const source = offlineCtx.createBufferSource();
+  source.buffer = decodedBuffer;
+  
+  const gainNode = offlineCtx.createGain();
+  
+  if (isFadeEnabled && fadeDuration > 0) {
+    gainNode.gain.setValueAtTime(0, 0);
+    gainNode.gain.linearRampToValueAtTime(volume, Math.min(fadeDuration, duration));
+    
+    if (duration > fadeDuration) {
+      gainNode.gain.setValueAtTime(volume, duration - fadeDuration);
+      gainNode.gain.linearRampToValueAtTime(0, duration);
+    }
+  } else {
+    gainNode.gain.setValueAtTime(volume, 0);
+  }
+  
+  source.connect(gainNode);
+  gainNode.connect(offlineCtx.destination);
+  
+  source.start(0, start, duration);
+  
+  return await offlineCtx.startRendering();
+}
+
+// Helper: Convert AudioBuffer to 16-bit WAV ArrayBuffer
+function bufferToWav(buffer) {
+  let numOfChan = buffer.numberOfChannels,
+      length = buffer.length * numOfChan * 2 + 44,
+      bufferArr = new ArrayBuffer(length),
+      view = new DataView(bufferArr),
+      channels = [], i, sample,
+      offset = 0,
+      pos = 0;
+
+  setUint32(0x46464952);                         // "RIFF"
+  setUint32(length - 8);                         // file length - 8
+  setUint32(0x45564157);                         // "WAVE"
+
+  setUint32(0x20746d66);                         // "fmt " chunk
+  setUint32(16);                                 // chunk length
+  setUint16(1);                                  // sample format (raw)
+  setUint16(numOfChan);                          // channel count
+  setUint32(buffer.sampleRate);                  // sample rate
+  setUint32(buffer.sampleRate * 2 * numOfChan); // byte rate
+  setUint16(numOfChan * 2);                      // block align
+  setUint16(16);                                 // bits per sample
+
+  setUint32(0x61746164);                         // "data" - chunk
+  setUint32(length - pos - 4);                   // chunk length
+
+  for (i = 0; i < buffer.numberOfChannels; i++)
+    channels.push(buffer.getChannelData(i));
+
+  while (pos < length) {
+    for (i = 0; i < numOfChan; i++) {
+      sample = Math.max(-1, Math.min(1, channels[i][offset]));
+      sample = (sample < 0 ? sample * 0x8000 : sample * 0x7FFF);
+      view.setInt16(pos, sample, true);
+      pos += 2;
+    }
+    offset++;
+  }
+
+  return bufferArr;
+
+  function setUint16(data) {
+    view.setUint16(pos, data, true);
+    pos += 2;
+  }
+
+  function setUint32(data) {
+    view.setUint32(pos, data, true);
+    pos += 4;
+  }
+}
+
+// Helper: Convert ArrayBuffer to Base64 asynchronously using FileReader
+async function arrayBufferToBase64(buffer) {
+  const blob = new Blob([buffer], { type: 'audio/wav' });
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64 = reader.result.split(',')[1];
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
 }
 
 export default App;
