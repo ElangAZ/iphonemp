@@ -1060,7 +1060,7 @@ function App() {
       let muxer = new Muxer({
         target: new ArrayBufferTarget(),
         video: {
-          codec: 'V_VP8',
+          codec: 'V_VP9',
           width: canvas.width,
           height: canvas.height
         }
@@ -1076,7 +1076,7 @@ function App() {
 
       const fps = parseInt(renderFps, 10);
       encoder.configure({
-        codec: 'vp8',
+        codec: 'vp9',
         width: canvas.width,
         height: canvas.height,
         bitrate: parseInt(renderBitrate, 10) * 1000
