@@ -1762,89 +1762,50 @@ function App() {
     }
   };
 
-  // Sync seekbar and play state
-  useEffect(() => {
-    const handleTimeUpdate = () => {
-      const player = getActivePlayer();
-      if (player) {
-        setCurrentTime(player.currentTime);
-        // Automatically stop rendering once custom end time limit is met
-        if (isRecordingRef.current) {
-          const startSecs = parseTimeToSeconds(renderStartRef.current);
-          const limitSecs = parseTimeToSeconds(renderEndRef.current);
-          const totalSecs = limitSecs - startSecs;
-          if (totalSecs > 0) {
-            const currentProgress = Math.min(100, Math.round(((player.currentTime - startSecs) / totalSecs) * 100));
-            setRenderProgress(Math.max(0, currentProgress));
-          }
-          if (player.currentTime >= limitSecs) {
-            player.pause();
-            if (toggleVideoRecordRef.current) {
-              toggleVideoRecordRef.current(); // Complete snippet rendering
-            }
-          }
-        }
-      }
-    };
-
-    const handleLoadedMetadata = () => {
-      const player = getActivePlayer();
-      if (player) {
-        setDuration(player.duration);
-        setRenderStart('0:00');
-        setRenderEnd(formatTime(player.duration));
-      }
-    };
-
-    const handleEnded = () => {
-      setIsPlaying(false);
+  const handleTimeUpdate = () => {
+    const player = getActivePlayer();
+    if (player) {
+      setCurrentTime(player.currentTime);
+      // Automatically stop rendering once custom end time limit is met
       if (isRecordingRef.current) {
-        if (toggleVideoRecordRef.current) {
-          toggleVideoRecordRef.current(); // End recording automatically when song completes
+        const startSecs = parseTimeToSeconds(renderStartRef.current);
+        const limitSecs = parseTimeToSeconds(renderEndRef.current);
+        const totalSecs = limitSecs - startSecs;
+        if (totalSecs > 0) {
+          const currentProgress = Math.min(100, Math.round(((player.currentTime - startSecs) / totalSecs) * 100));
+          setRenderProgress(Math.max(0, currentProgress));
+        }
+        if (player.currentTime >= limitSecs) {
+          player.pause();
+          if (toggleVideoRecordRef.current) {
+            toggleVideoRecordRef.current(); // Complete snippet rendering
+          }
         }
       }
-    };
-
-    // Keep React state in sync with native playback events
-    const handlePlay = () => setIsPlaying(true);
-    const handlePause = () => setIsPlaying(false);
-
-    // Listen to both elements
-    const audioEl = audioRef.current;
-    const videoEl = videoRef.current;
-
-    if (audioEl) {
-      audioEl.addEventListener('timeupdate', handleTimeUpdate);
-      audioEl.addEventListener('loadedmetadata', handleLoadedMetadata);
-      audioEl.addEventListener('play', handlePlay);
-      audioEl.addEventListener('pause', handlePause);
-      audioEl.addEventListener('ended', handleEnded);
     }
-    if (videoEl) {
-      videoEl.addEventListener('timeupdate', handleTimeUpdate);
-      videoEl.addEventListener('loadedmetadata', handleLoadedMetadata);
-      videoEl.addEventListener('play', handlePlay);
-      videoEl.addEventListener('pause', handlePause);
-      videoEl.addEventListener('ended', handleEnded);
-    }
+  };
 
-    return () => {
-      if (audioEl) {
-        audioEl.removeEventListener('timeupdate', handleTimeUpdate);
-        audioEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        audioEl.removeEventListener('play', handlePlay);
-        audioEl.removeEventListener('pause', handlePause);
-        audioEl.removeEventListener('ended', handleEnded);
+  const handleLoadedMetadata = () => {
+    const player = getActivePlayer();
+    if (player) {
+      setDuration(player.duration);
+      setRenderStart('0:00');
+      setRenderEnd(formatTime(player.duration));
+    }
+  };
+
+  const handleEnded = () => {
+    setIsPlaying(false);
+    if (isRecordingRef.current) {
+      if (toggleVideoRecordRef.current) {
+        toggleVideoRecordRef.current(); // End recording automatically when song completes
       }
-      if (videoEl) {
-        videoEl.removeEventListener('timeupdate', handleTimeUpdate);
-        videoEl.removeEventListener('loadedmetadata', handleLoadedMetadata);
-        videoEl.removeEventListener('play', handlePlay);
-        videoEl.removeEventListener('pause', handlePause);
-        videoEl.removeEventListener('ended', handleEnded);
-      }
-    };
-  }, [isVideo]);
+    }
+  };
+
+  // Keep React state in sync with native playback events
+  const handlePlay = () => setIsPlaying(true);
+  const handlePause = () => setIsPlaying(false);
 
   // Live UI Visualizer Loop
   useEffect(() => {
@@ -2122,6 +2083,12 @@ function App() {
                   ref={videoRef} 
                   className={`artwork-video ${artworkUrl ? '' : 'visible'}`} 
                   playsInline 
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onDurationChange={handleLoadedMetadata}
+                  onTimeUpdate={handleTimeUpdate}
+                  onEnded={handleEnded}
+                  onPlay={handlePlay}
+                  onPause={handlePause}
                 />
               ) : (
                 artworkUrl ? (
@@ -2478,7 +2445,16 @@ function App() {
         </div>
       )}
 
-      <audio ref={audioRef} style={{ display: 'none' }} />
+      <audio 
+        ref={audioRef} 
+        style={{ display: 'none' }} 
+        onLoadedMetadata={handleLoadedMetadata}
+        onDurationChange={handleLoadedMetadata}
+        onTimeUpdate={handleTimeUpdate}
+        onEnded={handleEnded}
+        onPlay={handlePlay}
+        onPause={handlePause}
+      />
     </>
   );
 }
