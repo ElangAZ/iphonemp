@@ -830,7 +830,7 @@ function App() {
       const textWidth = ctx.measureText(deviceName).width;
       
       const pillY = volY + 50;
-      const pillWidth = 32 + 20 + 14 + textWidth + 32; 
+      const pillWidth = 32 + 26 + 14 + textWidth + 32; 
       const pillHeight = 52;
       const pillX = btnCenter - pillWidth / 2;
       const pillRadius = 26;
@@ -843,8 +843,8 @@ function App() {
       // AirPlay Audio icon inside pill
       if (airplayImgRef.current && airplayImgRef.current.complete) {
         ctx.save();
-        ctx.translate(pillX + 32 + 10, pillY + 26);
-        ctx.scale(0.9, 0.9);
+        ctx.translate(pillX + 32 + 13, pillY + 26);
+        ctx.scale(1.2, 1.2);
         ctx.globalAlpha = 1.0;
         const img = airplayImgRef.current;
         const ratio = img.naturalWidth / img.naturalHeight;
@@ -1404,7 +1404,7 @@ function App() {
         ctx.font = '600 22px Inter';
         const textW = ctx.measureText(deviceName).width;
         const pillY = volY + 50;
-        const pillW = 32 + 20 + 14 + textW + 32;
+        const pillW = 32 + 26 + 14 + textW + 32;
         const pillH = 52;
         const pillX = btnCenter - pillW / 2;
         ctx.beginPath();
@@ -1415,8 +1415,8 @@ function App() {
         // AirPlay Audio icon inside pill
         if (airplayImgRef.current && airplayImgRef.current.complete) {
           ctx.save();
-          ctx.translate(pillX + 32 + 10, pillY + 26);
-          ctx.scale(0.9, 0.9);
+          ctx.translate(pillX + 32 + 13, pillY + 26);
+          ctx.scale(1.2, 1.2);
           ctx.globalAlpha = 1.0;
           const img = airplayImgRef.current;
           const ratio = img.naturalWidth / img.naturalHeight;
@@ -2258,7 +2258,7 @@ function App() {
                 onClick={() => setIsEditingDevice(true)} 
                 title="Klik untuk ganti nama device"
               >
-                <img src="/airplay.png" alt="AirPlay" style={{ width: '13px', height: '13px', marginRight: '4px' }} />
+                <img src="/airplay.png" alt="AirPlay" style={{ width: '17px', height: '17px' }} />
                 <span>{deviceName}</span>
               </button>
             )}
