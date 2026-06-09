@@ -800,12 +800,12 @@ function App() {
       // Right high-volume speaker icon (Scaled up by 1.8x)
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
         ctx.save();
-        ctx.translate(volX + volWidth + 14, volY - 16.6);
+        ctx.translate(volX + volWidth + 14, volY - 5.8);
         ctx.scale(1.8, 1.8);
         ctx.globalAlpha = 0.45;
         const img = volumeHighImgRef.current;
         const ratio = img.naturalWidth / img.naturalHeight;
-        ctx.drawImage(img, 0, 0, 24 * ratio, 24);
+        ctx.drawImage(img, 0, 0, 12 * ratio, 12);
         ctx.restore();
       }
       
@@ -1364,12 +1364,12 @@ function App() {
         // Right high-volume speaker icon (Scaled up by 1.8x)
         if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
           ctx.save();
-          ctx.translate(volX + volWidth + 14, volY - 16.6);
+          ctx.translate(volX + volWidth + 14, volY - 5.8);
           ctx.scale(1.8, 1.8);
           ctx.globalAlpha = 0.45;
           const img = volumeHighImgRef.current;
           const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, 0, 0, 24 * ratio, 24);
+          ctx.drawImage(img, 0, 0, 12 * ratio, 12);
           ctx.restore();
         }
 
