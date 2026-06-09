@@ -280,7 +280,7 @@ body {
 /* Progress bar */
 .progress-section {
   padding: 0 24px;
-  margin-top: 10px;
+  margin-top: 4px;
   margin-bottom: 2px;
 }
 
@@ -291,7 +291,7 @@ body {
   border-radius: 4px;
   cursor: pointer;
   position: relative;
-  margin-bottom: 8px;
+  margin-bottom: 3px;
   transition: background 0.15s ease;
 }
 
