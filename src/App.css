@@ -346,7 +346,7 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 20px;
+  gap: 32px;
 }
 
 .ctrl-btn {
@@ -369,8 +369,8 @@ body {
 }
 
 .play-btn {
-  width: 56px;
-  height: 56px;
+  width: 76px;
+  height: 76px;
   background: none;
   padding: 0;
   display: flex;
@@ -382,7 +382,7 @@ body {
 
 .play-btn svg { width: 40px; height: 40px; }
 .play-btn i {
-  font-size: 28px;
+  font-size: 44px;
   color: white;
   line-height: 1;
 }

@@ -2153,11 +2153,11 @@ function App() {
           {/* Player controls */}
           <div className="controls" style={{ position: 'relative' }}>
             {/* Star Outline - Positioned on the left */}
-            <button className="ctrl-btn small star-btn" style={{ position: 'absolute', left: '32px', opacity: 0.55 }}>
+            <button className="ctrl-btn small star-btn" style={{ position: 'absolute', left: '26px', opacity: 0.55 }}>
               <svg 
                 viewBox="0 0 24 24" 
-                width="28" 
-                height="28" 
+                width="38" 
+                height="38" 
                 fill="none" 
                 stroke="white" 
                 strokeWidth="2.2" 
@@ -2173,8 +2173,8 @@ function App() {
               <button className="ctrl-btn small">
                 <svg 
                   viewBox="0 0 24 24" 
-                  width="32" 
-                  height="32" 
+                  width="44" 
+                  height="44" 
                   fill="white" 
                   stroke="white" 
                   strokeWidth="2" 
@@ -2193,8 +2193,8 @@ function App() {
               <button className="ctrl-btn small">
                 <svg 
                   viewBox="0 0 24 24" 
-                  width="32" 
-                  height="32" 
+                  width="44" 
+                  height="44" 
                   fill="white" 
                   stroke="white" 
                   strokeWidth="2" 
