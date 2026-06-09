@@ -19,21 +19,31 @@ function App() {
   const [deviceName, setDeviceName] = useState('senux');
   const [isEditingDevice, setIsEditingDevice] = useState(false);
 
-  // FFmpeg transcode states
-  const [showModal, setShowModal] = useState(false);
-  const [webmBlob, setWebmBlob] = useState(null);
-  const [conversionStatus, setConversionStatus] = useState('idle'); // 'idle', 'loading_ffmpeg', 'converting', 'success', 'error'
-  const [conversionProgress, setConversionProgress] = useState(0);
+  // Unified render phase state machine
+  const [renderPhase, setRenderPhase] = useState('idle'); // 'idle', 'recording', 'converting', 'done', 'error'
+  const [renderProgress, setRenderProgress] = useState(0);
+  const [convertProgress, setConvertProgress] = useState(0);
+  const [renderResult, setRenderResult] = useState(null); // Final MP4 Blob
+  const [renderFileSize, setRenderFileSize] = useState(0);
+  const [renderError, setRenderError] = useState('');
+  const [estimatedTimeRemaining, setEstimatedTimeRemaining] = useState(null);
+  const [renderErrorDetails, setRenderErrorDetails] = useState('');
+  const [showErrorDetails, setShowErrorDetails] = useState(false);
 
   // Snippet and format rendering states
   const [renderStart, setRenderStart] = useState('0:00');
   const [renderEnd, setRenderEnd] = useState('0:30');
   const [renderResolution, setRenderResolution] = useState('720'); // '720' or '1080'
   const [renderFps, setRenderFps] = useState('30'); // '30' or '60'
+  const [renderBitrate, setRenderBitrate] = useState('3500'); // kbps: '2000', '3500', '6000'
+  const [renderAudioQuality, setRenderAudioQuality] = useState('256'); // kbps: '128', '256', '320'
   const [isAudioFadeEnabled, setIsAudioFadeEnabled] = useState(true); // Toggle audio fading
   const [audioFadeDuration, setAudioFadeDuration] = useState('1'); // Audio fade duration in seconds
+  const [usedNativeMp4, setUsedNativeMp4] = useState(false); // Track if native MP4 was used
+  const [nativeRenderUri, setNativeRenderUri] = useState('');
 
   const audioRef = useRef(null);
+  const songFileRef = useRef(null);
   const videoRef = useRef(null);
   const fileInputRef = useRef(null);
   const coverInputRef = useRef(null);
@@ -46,7 +56,6 @@ function App() {
 
   const titleRef = useRef(null);
   const containerRef = useRef(null);
-  const ffmpegRef = useRef(null);
 
   const isRecordingRef = useRef(isRecording);
   const renderStartRef = useRef(renderStart);
@@ -191,6 +200,7 @@ function App() {
     const file = e.target.files[0];
     if (!file) return;
 
+    songFileRef.current = file;
     const url = URL.createObjectURL(file);
     const fileIsVideo = file.type.startsWith('video/');
 
@@ -274,6 +284,48 @@ function App() {
     let textScrollOffset = 0;
     let scrollPauseTicks = 0;
     const videoSmoothHeights = new Array(6).fill(0);
+
+    // 1. Prepare optimized blurred background canvas ONCE to avoid lag & black lines
+    let cachedBgCanvas = null;
+    let bgFallbackColor = '#0a0a14'; // Solid fallback to prevent any transparent pixels
+    if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+      // Step A: Draw a small thumbnail to sample average colors
+      const sampleCanvas = document.createElement('canvas');
+      sampleCanvas.width = 4;
+      sampleCanvas.height = 4;
+      const sampleCtx = sampleCanvas.getContext('2d');
+      sampleCtx.drawImage(coverImgObj, 0, 0, 4, 4);
+      // Extract average color from the center pixel as solid fallback
+      try {
+        const px = sampleCtx.getImageData(1, 1, 1, 1).data;
+        bgFallbackColor = `rgb(${Math.max(0, px[0] - 20)}, ${Math.max(0, px[1] - 20)}, ${Math.max(0, px[2] - 20)})`;
+      } catch (e) { /* CORS: use default */ }
+
+      // Step B: Create a 360x640 cached blur canvas (large enough to avoid upscale artifacts)
+      cachedBgCanvas = document.createElement('canvas');
+      cachedBgCanvas.width = 360;
+      cachedBgCanvas.height = 640;
+      const cachedBgCtx = cachedBgCanvas.getContext('2d');
+
+      // Fill entire cached canvas with solid fallback color first (prevents ANY transparent pixels)
+      cachedBgCtx.fillStyle = bgFallbackColor;
+      cachedBgCtx.fillRect(0, 0, 360, 640);
+
+      // Draw cover image scaled to fill, with strong blur to create dreamy background
+      cachedBgCtx.imageSmoothingEnabled = true;
+      cachedBgCtx.imageSmoothingQuality = 'high';
+      cachedBgCtx.save();
+      cachedBgCtx.filter = 'blur(20px) saturate(1.7) brightness(1.05)';
+      // Draw with 40px overflow on all sides to prevent edge bleeding
+      cachedBgCtx.drawImage(coverImgObj, -40, -40, 440, 720);
+      cachedBgCtx.restore();
+    }
+
+    // 2. Reusable offscreen canvas for marquee text masking to prevent garbage collection lag
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = 560; // Max possible logical width
+    offCanvas.height = 60;
+    const offCtx = offCanvas.getContext('2d');
     
     // Helper to draw image/video with object-fit: cover cropped-centering
     const drawMediaCover = (media, x, y, w, h, r, isVideoType) => {
@@ -349,30 +401,24 @@ function App() {
         }
       }
 
-      // 1. Draw heavy blur background using cover art (on physical canvas dimensions)
-      ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-      ctx.save();
+      // 1. Draw background — NEVER leave transparent pixels (root cause of black lines)
+      // Fill solid color FIRST to guarantee zero transparency in every single frame
+      ctx.fillStyle = bgFallbackColor;
+      ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       
-      if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
-        // High-performance ultra-dreamy blur (16x16 downscale + 45px filter) for perfect iOS-style color blending
-        ctx.imageSmoothingEnabled = true;
-        
-        const tinyCanvas = document.createElement('canvas');
-        tinyCanvas.width = 16;
-        tinyCanvas.height = 16;
-        const tinyCtx = tinyCanvas.getContext('2d');
-        tinyCtx.drawImage(coverImgObj, 0, 0, 16, 16);
-        
+      if (cachedBgCanvas) {
         ctx.save();
-        ctx.filter = 'blur(45px) saturate(1.7) brightness(1.05)';
-        ctx.drawImage(tinyCanvas, -150, -150, canvasWidth + 300, canvasHeight + 300);
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = isRecordingRef.current ? 'low' : 'medium';
+        // Draw cached blur canvas stretched to fill, with slight overflow to prevent edge gaps
+        ctx.drawImage(cachedBgCanvas, -2, -2, canvasWidth + 4, canvasHeight + 4);
         ctx.restore();
         
         // Add a premium subtle dark overlay
         ctx.fillStyle = 'rgba(10, 10, 20, 0.35)';
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       } else {
-        // Fallback dark gradient background
+        // Fallback dark gradient background (solid, no transparency)
         const bgGrad = ctx.createRadialGradient(canvasWidth * 0.3, canvasHeight * 0.2, 0, canvasWidth * 0.3, canvasHeight * 0.2, canvasHeight);
         bgGrad.addColorStop(0, '#1e1b4b');
         bgGrad.addColorStop(0.4, '#0f0e1a');
@@ -380,7 +426,6 @@ function App() {
         ctx.fillStyle = bgGrad;
         ctx.fillRect(0, 0, canvasWidth, canvasHeight);
       }
-      ctx.restore();
 
       // 2. Translate and Scale logical coordinate space based on physical canvasWidth
       const width = 720;
@@ -397,11 +442,6 @@ function App() {
       const cardRadius = 75;
 
       ctx.save();
-      // Draw card round path with shadow
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
-      ctx.shadowBlur = 100;
-      ctx.shadowOffsetY = 40;
-      
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
       ctx.fillStyle = 'rgba(15, 15, 15, 0.45)';
@@ -455,12 +495,10 @@ function App() {
       const maxTextWidth = cardWidth - (artPadding * 2) - 80;
       const titleWidth = ctx.measureText(songTitle).width;
       
-      if (titleWidth > maxTextWidth) {
-        // Create an offscreen canvas for the marquee text masking
-        const offCanvas = document.createElement('canvas');
-        offCanvas.width = maxTextWidth;
-        offCanvas.height = 60;
-        const offCtx = offCanvas.getContext('2d');
+      if (titleWidth > maxTextWidth && !isRecordingRef.current) {
+        // Reuse pre-allocated offscreen canvas to avoid GC allocations & performance spikes
+        offCtx.clearRect(0, 0, maxTextWidth, 60);
+        offCtx.globalCompositeOperation = 'source-over';
 
         // Draw scrolling text on the offscreen canvas
         offCtx.fillStyle = '#ffffff';
@@ -495,7 +533,7 @@ function App() {
         offCtx.fillRect(0, 0, maxTextWidth, 60);
 
         // Draw the masked offscreen canvas back to the main canvas
-        ctx.drawImage(offCanvas, cardX + artPadding, infoY - 30);
+        ctx.drawImage(offCanvas, 0, 0, maxTextWidth, 60, cardX + artPadding, infoY - 30, maxTextWidth, 60);
 
         // Smooth scrolling title with timed pause matching the CSS keyframes
         if (scrollPauseTicks > 0) {
@@ -508,7 +546,16 @@ function App() {
           }
         }
       } else {
-        ctx.fillText(songTitle, cardX + artPadding, infoY);
+        let displayTitle = songTitle;
+        if (titleWidth > maxTextWidth) {
+          let len = songTitle.length;
+          while (len > 0 && ctx.measureText(displayTitle + '...').width > maxTextWidth) {
+            len--;
+            displayTitle = songTitle.substring(0, len);
+          }
+          displayTitle += '...';
+        }
+        ctx.fillText(displayTitle, cardX + artPadding, infoY);
       }
 
       // Draw Artist
@@ -594,10 +641,39 @@ function App() {
       ctx.textAlign = 'right';
       const remainingTime = dur > 0 ? (dur - curT) : 0;
       ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 38);
-
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
       const ctrlY = seekY + 90;
       const btnCenter = cardX + cardWidth / 2;
+
+      // Star Outline - Leftmost
+      ctx.save();
+      ctx.translate(btnCenter - 190, ctrlY);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.lineWidth = 2.5;
+      ctx.lineJoin = 'round';
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      // Draw a 5-pointed star
+      const spikes = 5;
+      const outerRadius = 16;
+      const innerRadius = 7.5;
+      let rot = Math.PI / 2 * 3;
+      const step = Math.PI / spikes;
+      ctx.moveTo(0, -outerRadius);
+      for (let i = 0; i < spikes; i++) {
+        let x = Math.cos(rot) * outerRadius;
+        let y = Math.sin(rot) * outerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+
+        x = Math.cos(rot) * innerRadius;
+        y = Math.sin(rot) * innerRadius;
+        ctx.lineTo(x, y);
+        rot += step;
+      }
+      ctx.closePath();
+      ctx.stroke();
+      ctx.restore();
 
       // Skip Back (<<) - Left
       ctx.save();
@@ -605,21 +681,21 @@ function App() {
       ctx.scale(2.8, 2.4);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2.0;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
       
       ctx.beginPath();
       // Left triangle
-      ctx.moveTo(0.5, -6);
-      ctx.lineTo(-8.5, 0);
-      ctx.lineTo(0.5, 6);
+      ctx.moveTo(-1, -6);
+      ctx.lineTo(-9, 0);
+      ctx.lineTo(-1, 6);
       ctx.closePath();
       
       // Right triangle
-      ctx.moveTo(8.5, -6);
-      ctx.lineTo(-0.5, 0);
-      ctx.lineTo(8.5, 6);
+      ctx.moveTo(9, -6);
+      ctx.lineTo(1, 0);
+      ctx.lineTo(9, 6);
       ctx.closePath();
       
       ctx.fill();
@@ -655,21 +731,21 @@ function App() {
       ctx.scale(2.8, 2.4);
       ctx.fillStyle = '#ffffff';
       ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 2.2;
+      ctx.lineWidth = 2.0;
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
       ctx.beginPath();
       // Left triangle
-      ctx.moveTo(-8.5, -6);
-      ctx.lineTo(0.5, 0);
-      ctx.lineTo(-8.5, 6);
+      ctx.moveTo(-9, -6);
+      ctx.lineTo(-1, 0);
+      ctx.lineTo(-9, 6);
       ctx.closePath();
       
       // Right triangle
-      ctx.moveTo(-0.5, -6);
-      ctx.lineTo(8.5, 0);
-      ctx.lineTo(-0.5, 6);
+      ctx.moveTo(1, -6);
+      ctx.lineTo(9, 0);
+      ctx.lineTo(1, 6);
       ctx.closePath();
       
       ctx.fill();
@@ -806,123 +882,132 @@ function App() {
     return { start, end };
   };
 
+  const simpleFFT = (re, im) => {
+    const n = re.length;
+    if (n <= 1) return;
+    
+    const reEven = new Float32Array(n / 2);
+    const imEven = new Float32Array(n / 2);
+    const reOdd = new Float32Array(n / 2);
+    const imOdd = new Float32Array(n / 2);
+    
+    for (let i = 0; i < n / 2; i++) {
+      reEven[i] = re[2 * i];
+      imEven[i] = im[2 * i];
+      reOdd[i] = re[2 * i + 1];
+      imOdd[i] = im[2 * i + 1];
+    }
+    
+    simpleFFT(reEven, imEven);
+    simpleFFT(reOdd, imOdd);
+    
+    for (let k = 0; k < n / 2; k++) {
+      const angle = -2 * Math.PI * k / n;
+      const c = Math.cos(angle);
+      const s = Math.sin(angle);
+      const tRe = c * reOdd[k] - s * imOdd[k];
+      const tIm = s * reOdd[k] + c * imOdd[k];
+      
+      re[k] = reEven[k] + tRe;
+      im[k] = imEven[k] + tIm;
+      re[k + n / 2] = reEven[k] - tRe;
+      im[k + n / 2] = imEven[k] - tIm;
+    }
+  };
+
+  const getFFTDataAtTime = (audioBuffer, time) => {
+    const sampleRate = audioBuffer.sampleRate;
+    const startIndex = Math.floor(time * sampleRate);
+    const fftSize = 512;
+    const re = new Float32Array(fftSize);
+    const im = new Float32Array(fftSize);
+    
+    let channelData;
+    if (audioBuffer.numberOfChannels > 0) {
+      channelData = audioBuffer.getChannelData(0);
+    } else {
+      return new Uint8Array(fftSize / 2);
+    }
+
+    for (let i = 0; i < fftSize; i++) {
+      const idx = startIndex + i;
+      if (idx >= 0 && idx < channelData.length) {
+        const windowValue = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (fftSize - 1)));
+        re[i] = channelData[idx] * windowValue;
+      } else {
+        re[i] = 0;
+      }
+      im[i] = 0;
+    }
+
+    simpleFFT(re, im);
+
+    const magnitudes = new Uint8Array(fftSize / 2);
+    for (let i = 0; i < fftSize / 2; i++) {
+      const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
+      magnitudes[i] = Math.min(255, Math.floor(mag * 380));
+    }
+
+    return magnitudes;
+  };
+
   // Video recording toggle handler (High definition canvas output with Web Audio context source)
   const toggleVideoRecord = async () => {
     if (isRecordingRef.current) {
-      // Stop recording
-      isRecordingRef.current = false;
-      setIsRecording(false);
-      setIsPlaying(false);
-      
-      const player = getActivePlayer();
-      if (player) {
-        if (!player.paused) {
-          player.pause();
-        }
-        player.volume = volume; // Restore user's default volume
-      }
+      // If currently exporting, we can cancel
+      cancelRender();
+      return;
+    }
 
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-      }
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    } else {
-      // Start recording
-      const canvas = canvasRef.current;
-      if (!canvas) return;
+    const player = getActivePlayer();
+    if (!player || !player.src || !songFileRef.current) {
+      alert("Please upload/load a song file (.mp3 / .wav) before exporting.");
+      return;
+    }
 
-      const player = getActivePlayer();
-      if (!player || !player.src) {
-        alert("Please load a song or video before recording.");
-        return;
-      }
+    isRecordingRef.current = true;
+    setIsRecording(true);
+    setRenderPhase('recording');
+    setRenderProgress(0);
+    setConvertProgress(0);
+    setRenderError('');
 
-      // Check audioContext and setup if needed
-      if (!audioContextRef.current) {
-        setupWebAudio(player, isVideo);
-      }
-
-      isRecordingRef.current = true;
-      setIsRecording(true);
-      recordedChunksRef.current = [];
-
-      // 1. Wait for all web fonts to be fully loaded (critical for canvas text rendering on mobile)
+    try {
+      // 1. Wait for fonts
       try {
         await document.fonts.ready;
       } catch (e) {
-        console.warn("Font loading check failed, proceeding anyway:", e);
+        console.warn(e);
       }
 
-      // 2. Prepare cover image - clone to a fresh Image to guarantee load state
+      // 2. Load cover image
       let coverImgObj = null;
       const domImg = document.querySelector('.artwork-img');
       if (domImg && domImg.src && domImg.naturalWidth > 0) {
-        // DOM image is already loaded and valid, use it directly
         coverImgObj = domImg;
       } else if (artworkUrl) {
-        // Create new image and wait for it to fully load
         coverImgObj = new Image();
         coverImgObj.crossOrigin = 'anonymous';
         await new Promise((resolve) => {
           coverImgObj.onload = resolve;
-          coverImgObj.onerror = resolve; // proceed even if image fails
+          coverImgObj.onerror = resolve;
           coverImgObj.src = artworkUrl;
-          // If already cached/complete, resolve immediately
           if (coverImgObj.complete && coverImgObj.naturalWidth > 0) resolve();
         });
       }
 
-      // 3. Validate render start/end and wait for player metadata before seeking
       const durationSeconds = player.duration || 0;
       const { start, end } = normalizeRenderRange(renderStart, renderEnd, durationSeconds);
       if (durationSeconds > 0 && start >= durationSeconds) {
-        alert('Waktu render tidak valid. Pastikan "Mulai" berada di dalam durasi lagu/video.');
+        alert('Waktu render tidak valid.');
         isRecordingRef.current = false;
         setIsRecording(false);
+        setRenderPhase('idle');
         return;
       }
 
-      if (end <= start) {
-        alert('Waktu render tidak valid. Pastikan "Sampai" lebih besar dari "Mulai".');
-        isRecordingRef.current = false;
-        setIsRecording(false);
-        return;
-      }
-
-      // Keep refs in sync with the validated snippet range for rendering and stopping logic
-      const validatedStart = formatTime(start);
-      const validatedEnd = formatTime(end);
-      renderStartRef.current = validatedStart;
-      renderEndRef.current = validatedEnd;
-      if (validatedStart !== renderStart) setRenderStart(validatedStart);
-      if (validatedEnd !== renderEnd) setRenderEnd(validatedEnd);
-
-      if (player.readyState < 1) {
-        await new Promise((resolve) => {
-          const onLoaded = () => {
-            player.removeEventListener('loadedmetadata', onLoaded);
-            resolve();
-          };
-          player.addEventListener('loadedmetadata', onLoaded);
-          // Safety timeout if loadedmetadata never fires
-          setTimeout(resolve, 1500);
-        });
-      }
-
-      player.currentTime = start;
-      await new Promise((resolve) => {
-        const onSeeked = () => {
-          player.removeEventListener('seeked', onSeeked);
-          resolve();
-        };
-        player.addEventListener('seeked', onSeeked);
-        // Safety timeout in case seeked event never fires (some mobile browsers)
-        setTimeout(resolve, 1500);
-      });
-
-      // Configure resolution dynamically on the physical canvas object
+      // Set up Canvas resolution
+      const canvas = canvasRef.current;
       if (renderResolution === '1080') {
         canvas.width = 1080;
         canvas.height = 1920;
@@ -930,79 +1015,554 @@ function App() {
         canvas.width = 720;
         canvas.height = 1280;
       }
-
       const ctx = canvas.getContext('2d');
-      const width = canvas.width;
-      const height = canvas.height;
 
-      // Start rendering loop (fonts loaded, image ready, player seeked)
-      startCanvasRenderLoop(ctx, width, height, coverImgObj, isVideo, videoRef.current);
+      setRenderError('Mendecode audio untuk ekspor offline...');
+      // 3. Decode audio buffer to PCM
+      const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      const fileArrayBuffer = await songFileRef.current.arrayBuffer();
+      const decodedBuffer = await audioCtx.decodeAudioData(fileArrayBuffer);
 
-      // Capture video track at dynamic framerate (30 FPS or 60 FPS)
-      const canvasStream = canvas.captureStream(parseInt(renderFps, 10));
+      setRenderError('Mengekspor video frame-demi-frame...');
       
-      // Capture digital audio track from our Web Audio destination node
-      let audioTrack = null;
-      if (audioDestinationRef.current) {
-        const audioStream = audioDestinationRef.current.stream;
-        if (audioStream && audioStream.getAudioTracks().length > 0) {
-          audioTrack = audioStream.getAudioTracks()[0];
+      // 4. Set up Muxer and VideoEncoder
+      const { Muxer, ArrayBufferTarget } = await import('webm-muxer');
+
+      let muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: {
+          codec: 'V_VP8',
+          width: canvas.width,
+          height: canvas.height
+        }
+      });
+
+      let encoder = new VideoEncoder({
+        output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
+        error: (e) => {
+          console.error(e);
+          throw e;
+        }
+      });
+
+      const fps = parseInt(renderFps, 10);
+      encoder.configure({
+        codec: 'vp8',
+        width: canvas.width,
+        height: canvas.height,
+        bitrate: parseInt(renderBitrate, 10) * 1000
+      });
+
+      // Prepare drawing resources once
+      let bgFallbackColor = '#0a0a14';
+      let cachedBgCanvas = null;
+      if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+        const sampleCanvas = document.createElement('canvas');
+        sampleCanvas.width = 4;
+        sampleCanvas.height = 4;
+        const sampleCtx = sampleCanvas.getContext('2d');
+        sampleCtx.drawImage(coverImgObj, 0, 0, 4, 4);
+        try {
+          const px = sampleCtx.getImageData(1, 1, 1, 1).data;
+          bgFallbackColor = `rgb(${Math.max(0, px[0] - 20)}, ${Math.max(0, px[1] - 20)}, ${Math.max(0, px[2] - 20)})`;
+        } catch (e) {}
+
+        cachedBgCanvas = document.createElement('canvas');
+        cachedBgCanvas.width = 360;
+        cachedBgCanvas.height = 640;
+        const cachedBgCtx = cachedBgCanvas.getContext('2d');
+        cachedBgCtx.fillStyle = bgFallbackColor;
+        cachedBgCtx.fillRect(0, 0, 360, 640);
+        cachedBgCtx.imageSmoothingEnabled = true;
+        cachedBgCtx.imageSmoothingQuality = 'low';
+        cachedBgCtx.save();
+        cachedBgCtx.filter = 'blur(20px) saturate(1.7) brightness(1.05)';
+        cachedBgCtx.drawImage(coverImgObj, -40, -40, 440, 720);
+        cachedBgCtx.restore();
+      }
+
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = 560;
+      offCanvas.height = 60;
+      const offCtx = offCanvas.getContext('2d');
+
+      const timeStep = 1 / fps;
+      let currentTime = start;
+      let frameIndex = 0;
+      const totalFrames = Math.ceil((end - start) / timeStep);
+
+      const videoSmoothHeights = new Array(6).fill(0);
+      const prevMagnitudes = new Float32Array(256);
+      const renderStartTime = performance.now();
+
+      // Draw loop
+      while (currentTime < end) {
+        if (!isRecordingRef.current) {
+          // Cancelled mid-process
+          return;
+        }
+
+        const rawMagnitudes = getFFTDataAtTime(decodedBuffer, currentTime);
+        const magnitudes = new Uint8Array(256);
+        const smoothing = 0.82;
+        for (let i = 0; i < 256; i++) {
+          const smoothedVal = prevMagnitudes[i] * smoothing + rawMagnitudes[i] * (1 - smoothing);
+          magnitudes[i] = smoothedVal;
+          prevMagnitudes[i] = smoothedVal;
+        }
+        
+        // Render Frame
+        ctx.fillStyle = bgFallbackColor;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        if (cachedBgCanvas) {
+          ctx.save();
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'low';
+          ctx.drawImage(cachedBgCanvas, -2, -2, canvas.width + 4, canvas.height + 4);
+          ctx.restore();
+          ctx.fillStyle = 'rgba(10, 10, 20, 0.35)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        const scaleFactor = canvas.width / 720;
+        ctx.save();
+        ctx.scale(scaleFactor, scaleFactor);
+
+        const cardWidth = 560;
+        const cardHeight = 960;
+        const cardX = (720 - cardWidth) / 2;
+        const cardY = (1280 - cardHeight) / 2;
+        const cardRadius = 75;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
+        ctx.fillStyle = 'rgba(15, 15, 15, 0.45)';
+        ctx.fill();
+        ctx.restore();
+
+        const artPadding = 35;
+        const artSize = cardWidth - (artPadding * 2);
+        const artX = cardX + artPadding;
+        const artY = cardY + artPadding;
+        const artRadius = 20;
+
+        if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+          ctx.clip();
+          const mRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
+          let sx = 0, sy = 0, sw = coverImgObj.naturalWidth, sh = coverImgObj.naturalHeight;
+          if (mRatio > 1) {
+            sw = coverImgObj.naturalHeight;
+            sx = (coverImgObj.naturalWidth - sw) / 2;
+          } else {
+            sh = coverImgObj.naturalWidth;
+            sy = (coverImgObj.naturalHeight - sh) / 2;
+          }
+          ctx.drawImage(coverImgObj, sx, sy, sw, sh, artX, artY, artSize, artSize);
+          ctx.restore();
+        }
+
+        const infoY = artY + artSize + 60;
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '800 22px Inter';
+        ctx.textAlign = 'left';
+
+        const maxTextWidth = cardWidth - (artPadding * 2) - 80;
+        const titleWidth = ctx.measureText(songTitle).width;
+        let displayTitle = songTitle;
+        if (titleWidth > maxTextWidth) {
+          let len = songTitle.length;
+          while (len > 0 && ctx.measureText(displayTitle + '...').width > maxTextWidth) {
+            len--;
+            displayTitle = songTitle.substring(0, len);
+          }
+          displayTitle += '...';
+        }
+        ctx.fillText(displayTitle, cardX + artPadding, infoY);
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.font = '500 20px Inter';
+        ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
+
+        // Draw Spectrum
+        const specBarCount = 6;
+        const specGap = 3;
+        const specHeight = 40;
+        const specBarWidth = 2.5;
+        const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
+        const specX = cardX + cardWidth - artPadding - specTotalWidth;
+        const specCenterY = infoY + 10;
+
+        for (let i = 0; i < specBarCount; i++) {
+          let val = 0;
+          if (i === 0) {
+            let bassSum = magnitudes[0] + magnitudes[1];
+            val = bassSum / 2;
+          } else {
+            const freqBins = [20, 36, 56, 80, 110];
+            val = magnitudes[freqBins[i - 1] || 20] || 0;
+          }
+          const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+          const targetHeight = normalized * (specHeight / 2);
+          const decayRate = 0.75;
+          if (targetHeight > videoSmoothHeights[i]) {
+            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0;
+          } else {
+            videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
+          }
+          const halfH = Math.max(1.5, videoSmoothHeights[i]);
+          const bx = specX + i * (specBarWidth + specGap);
+
+          ctx.beginPath();
+          ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+        }
+
+        // Seekbar
+        const seekY = infoY + 80;
+        const seekWidth = cardWidth - (artPadding * 2);
+        ctx.beginPath();
+        ctx.roundRect(cardX + artPadding, seekY, seekWidth, 12, 6);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+
+        const progressPercent = durationSeconds > 0 ? (currentTime / durationSeconds) : 0;
+        ctx.beginPath();
+        ctx.roundRect(cardX + artPadding, seekY, seekWidth * progressPercent, 12, 6);
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = '500 18px Inter';
+        ctx.textAlign = 'left';
+        ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 38);
+
+        ctx.textAlign = 'right';
+        ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, cardX + cardWidth - artPadding, seekY + 38);
+
+        // Navigation Controls (Skip, Pause)
+        const ctrlY = seekY + 90;
+        const btnCenter = cardX + cardWidth / 2;
+
+        // Star Outline - Leftmost
+        ctx.save();
+        ctx.translate(btnCenter - 190, ctrlY);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 2.5;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        // Draw a 5-pointed star
+        const spikes = 5;
+        const outerRadius = 16;
+        const innerRadius = 7.5;
+        let rot = Math.PI / 2 * 3;
+        const step = Math.PI / spikes;
+        ctx.moveTo(0, -outerRadius);
+        for (let i = 0; i < spikes; i++) {
+          let x = Math.cos(rot) * outerRadius;
+          let y = Math.sin(rot) * outerRadius;
+          ctx.lineTo(x, y);
+          rot += step;
+
+          x = Math.cos(rot) * innerRadius;
+          y = Math.sin(rot) * innerRadius;
+          ctx.lineTo(x, y);
+          rot += step;
+        }
+        ctx.closePath();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(btnCenter - 95, ctrlY);
+        ctx.scale(2.8, 2.4);
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.0;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-1, -6);
+        ctx.lineTo(-9, 0);
+        ctx.lineTo(-1, 6);
+        ctx.closePath();
+        ctx.moveTo(9, -6);
+        ctx.lineTo(1, 0);
+        ctx.lineTo(9, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(btnCenter, ctrlY);
+        ctx.scale(2.5, 2.5);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.roundRect(-7.5, -11, 6, 22, 1.5);
+        ctx.roundRect(1.5, -11, 6, 22, 1.5);
+        ctx.fill();
+        ctx.restore();
+
+        ctx.save();
+        ctx.translate(btnCenter + 95, ctrlY);
+        ctx.scale(2.8, 2.4);
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 2.0;
+        ctx.lineJoin = 'round';
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(-9, -6);
+        ctx.lineTo(-1, 0);
+        ctx.lineTo(-9, 6);
+        ctx.closePath();
+        ctx.moveTo(1, -6);
+        ctx.lineTo(9, 0);
+        ctx.lineTo(1, 6);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+
+        // Volume bar
+        const volY = ctrlY + 80;
+        const volX = cardX + artPadding + 48;
+        const volWidth = cardWidth - (artPadding * 2) - 96;
+
+        ctx.save();
+        ctx.translate(volX - 42, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.beginPath();
+        ctx.moveTo(9, 6);
+        ctx.lineTo(5, 9);
+        ctx.lineTo(2, 9);
+        ctx.lineTo(2, 15);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(9, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+
+        ctx.beginPath();
+        ctx.roundRect(volX, volY, volWidth, 10, 5);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.fill();
+
+        ctx.save();
+        ctx.translate(volX + volWidth + 14, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(9, 6);
+        ctx.lineTo(5, 9);
+        ctx.lineTo(2, 9);
+        ctx.lineTo(2, 15);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(9, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
+        ctx.restore();
+
+        // Device Selector Pill
+        ctx.font = '600 22px Inter';
+        const textW = ctx.measureText(deviceName).width;
+        const pillY = volY + 50;
+        const pillW = 32 + 20 + 14 + textW + 32;
+        const pillH = 52;
+        const pillX = btnCenter - pillW / 2;
+        ctx.beginPath();
+        ctx.roundRect(pillX, pillY, pillW, pillH, 26);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+        ctx.fill();
+
+        // AirDrop icon inside pill (using Path2D)
+        ctx.save();
+        ctx.translate(pillX + 32 + 10, pillY + 26);
+        ctx.scale(0.028, 0.028);
+        ctx.translate(-512, -512);
+        ctx.fillStyle = '#ffffff';
+        const airdropPath = new Path2D("M938.666667 554.666667a426.666667 426.666667 0 0 1-109.653334 285.44 21.76 21.76 0 0 1-30.72 0l-15.36-15.36a21.76 21.76 0 0 1 0-29.013334 362.666667 362.666667 0 1 0-540.16 0 21.76 21.76 0 0 1 0 29.013334l-15.36 15.36a21.76 21.76 0 0 1-30.72 0A426.666667 426.666667 0 1 1 938.666667 554.666667zM512 256a298.666667 298.666667 0 0 0-226.986667 493.226667 23.893333 23.893333 0 0 0 15.36 7.253333 23.04 23.04 0 0 0 16.213334-6.4l14.933333-14.933333a21.333333 21.333333 0 0 0 0-29.013334 234.666667 234.666667 0 1 1 358.4 0 21.333333 21.333333 0 0 0 0 29.013334l14.933333 14.933333a23.04 23.04 0 0 0 16.213334 6.4 23.893333 23.893333 0 0 0 15.36-7.253333A298.666667 298.666667 0 0 0 512 256z m85.333333 360.533333a21.333333 21.333333 0 0 0 2.133334 27.306667l15.36 15.36a21.333333 21.333333 0 0 0 16.64 5.973333 20.053333 20.053333 0 0 0 15.36-8.533333 170.666667 170.666667 0 1 0-273.066667 0 20.053333 20.053333 0 0 0 15.36 8.533333 21.333333 21.333333 0 0 0 16.64-5.973333l15.36-15.36a21.333333 21.333333 0 0 0 2.133333-27.306667 106.666667 106.666667 0 1 1 174.08 0zM469.333333 554.666667a42.666667 42.666667 0 1 0 42.666667-42.666667 42.666667 42.666667 0 0 0-42.666667 42.666667z m74.666667 137.386666a32 32 0 0 0-22.613333-9.386666h-18.773334a32 32 0 0 0-22.613333 9.386666l-159.146667 158.72a21.76 21.76 0 0 0 0 30.293334l8.96 8.533333a20.053333 20.053333 0 0 0 14.933334 6.4h334.08a20.053333 20.053333 0 0 0 14.933333-6.4l8.96-8.533333a21.333333 21.333333 0 0 0 0-30.293334z");
+        ctx.fill(airdropPath);
+        ctx.restore();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '600 22px Inter';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(deviceName, pillX + 66, pillY + 26);
+
+        ctx.restore(); // Restore scaled coordinates
+
+        // Wait if hardware encoder queue is backing up to prevent Out Of Memory crashes
+        while (encoder.encodeQueueSize > 5) {
+          await new Promise(resolve => setTimeout(resolve, 15));
+        }
+
+        // Create frame and encode
+        const timestampUs = Math.round((currentTime - start) * 1e6);
+        const videoFrame = new VideoFrame(canvas, { timestamp: timestampUs });
+        encoder.encode(videoFrame, { keyFrame: frameIndex % 30 === 0 });
+        videoFrame.close();
+
+        // Update progress
+        const currentProgress = Math.min(100, Math.round((frameIndex / totalFrames) * 100));
+        setRenderProgress(currentProgress);
+
+        currentTime += timeStep;
+        frameIndex++;
+
+        // Calculate estimated time remaining
+        const elapsedMs = performance.now() - renderStartTime;
+        const progressFraction = frameIndex / totalFrames;
+        if (progressFraction > 0.03) {
+          const totalEstimatedTimeMs = elapsedMs / progressFraction;
+          const remainingTimeMs = totalEstimatedTimeMs - elapsedMs;
+          const remainingSeconds = Math.ceil(remainingTimeMs / 1000);
+          setEstimatedTimeRemaining(remainingSeconds);
+        } else {
+          setEstimatedTimeRemaining(null);
+        }
+
+        if (frameIndex % 8 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
         }
       }
 
-      // Combine video and audio tracks
-      const outputStream = new MediaStream();
-      canvasStream.getVideoTracks().forEach(track => outputStream.addTrack(track));
-      if (audioTrack) {
-        outputStream.addTrack(audioTrack);
+      setRenderError('Menyelesaikan encoding video WebM...');
+      await encoder.flush();
+      muxer.finalize();
+      const webmBuffer = muxer.target.buffer;
+      const recordedBlob = new Blob([webmBuffer], { type: 'video/webm' });
+      setRenderFileSize(recordedBlob.size);
+
+      // Now merge/transcode
+      if (window.Capacitor) {
+        setRenderPhase('converting');
+        setConvertProgress(10);
+        
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        const cacheDir = (Directory && Directory.Cache) ? Directory.Cache : 'CACHE';
+        
+        const videoFilename = 'temp_input.webm';
+        const originalName = songFileRef.current ? songFileRef.current.name : 'temp_audio.mp3';
+        const lastDotIdx = originalName.lastIndexOf('.');
+        const audioExt = lastDotIdx !== -1 ? originalName.substring(lastDotIdx) : '.mp3';
+        const audioFilename = `temp_audio${audioExt}`;
+
+        // Clean up
+        try { await Filesystem.deleteFile({ path: videoFilename, directory: cacheDir }); } catch (e) {}
+        try { await Filesystem.deleteFile({ path: audioFilename, directory: cacheDir }); } catch (e) {}
+
+        // Write silent WebM
+        setRenderError('Menyalin video ke penyimpanan native...');
+        const webmBlob = new Blob([webmBuffer], { type: 'video/webm' });
+        const videoBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(webmBlob);
+        });
+        await Filesystem.writeFile({
+          path: videoFilename,
+          data: videoBase64,
+          directory: cacheDir,
+          recursive: true
+        });
+        setConvertProgress(40);
+
+        // Write uploaded audio
+        setRenderError('Menyalin audio asli ke penyimpanan native...');
+        const audioBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(songFileRef.current);
+        });
+        await Filesystem.writeFile({
+          path: audioFilename,
+          data: audioBase64,
+          directory: cacheDir,
+          recursive: true
+        });
+        setConvertProgress(70);
+
+        const videoUriResult = await Filesystem.getUri({ path: videoFilename, directory: cacheDir });
+        const audioUriResult = await Filesystem.getUri({ path: audioFilename, directory: cacheDir });
+
+        const sanitizedTitle = (songTitle || 'senux_player').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const outputFilename = `${sanitizedTitle}_render.mp4`;
+        try { await Filesystem.deleteFile({ path: outputFilename, directory: cacheDir }); } catch (e) {}
+        const outputUriResult = await Filesystem.getUri({ path: outputFilename, directory: cacheDir });
+
+        setConvertProgress(80);
+        setRenderError('Menggabungkan video & audio secara native (Muxing)...');
+        
+        const { registerPlugin } = await import('@capacitor/core');
+        const VideoTranscoder = registerPlugin('VideoTranscoder');
+        
+        const transcodeResult = await VideoTranscoder.transcode({
+          videoPath: videoUriResult.uri,
+          audioPath: audioUriResult.uri,
+          audioStartMs: Math.round(start * 1000),
+          audioEndMs: Math.round(end * 1000),
+          outputPath: outputUriResult.uri
+        });
+
+        let outputSize = 0;
+        try {
+          const statResult = await Filesystem.stat({ path: outputFilename, directory: cacheDir });
+          outputSize = statResult.size || 0;
+        } catch (e) {}
+
+        // Clean up temp
+        try { await Filesystem.deleteFile({ path: videoFilename, directory: cacheDir }); } catch (e) {}
+        try { await Filesystem.deleteFile({ path: audioFilename, directory: cacheDir }); } catch (e) {}
+
+        setNativeRenderUri(transcodeResult.outputPath);
+        setRenderFileSize(outputSize);
+        setConvertProgress(100);
+        setRenderPhase('done');
+        setRenderError('');
+      } else {
+        // Web browser: fallback to downloading the silent WebM
+        setRenderResult(recordedBlob);
+        setRenderFileSize(recordedBlob.size);
+        setRenderPhase('done');
+        setRenderError('Ekspor WebM selesai (Browser web tidak mendukung muxing audio native).');
       }
-
-      // Initialize MediaRecorder - high quality WebM render as base format
-      let mimeType = 'video/webm;codecs=vp9,opus';
-      let fileExt = 'webm';
-
-      if (typeof MediaRecorder.isTypeSupported === 'function') {
-        if (MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')) {
-          mimeType = 'video/webm;codecs=vp9,opus';
-        } else if (MediaRecorder.isTypeSupported('video/webm')) {
-          mimeType = 'video/webm';
-        }
-      }
-
-      let recorder;
-      try {
-        const options = { 
-          mimeType,
-          videoBitsPerSecond: renderResolution === '1080' ? 6000000 : 3500000, // 6 Mbps for 1080p, 3.5 Mbps for 720p
-          audioBitsPerSecond: 320000 // Studio grade 320kbps audio encoding
-        };
-        recorder = new MediaRecorder(outputStream, options);
-      } catch (e) {
-        recorder = new MediaRecorder(outputStream);
-        mimeType = recorder.mimeType || 'video/webm';
-      }
-
-      recorder.ondataavailable = (event) => {
-        if (event.data && event.data.size > 0) {
-          recordedChunksRef.current.push(event.data);
-        }
-      };
-
-      recorder.onstop = () => {
-        const blob = new Blob(recordedChunksRef.current, { type: mimeType });
-        setWebmBlob(blob);
-        setShowModal(true);
-        setConversionStatus('idle');
-        setConversionProgress(0);
-      };
-
-      mediaRecorderRef.current = recorder;
-      recorder.start();
-
-      // 4. Start playback AFTER recorder is capturing (so no frames are lost)
-      if (player.paused) {
-        player.play().then(() => setIsPlaying(true)).catch(err => console.error("Play failed:", err));
-      }
+    } catch (error) {
+      console.error("Export error:", error);
+      setRenderPhase('error');
+      setRenderError('Gagal melakukan ekspor video: ' + error.message);
+      setRenderErrorDetails(error.stack || error.message || String(error));
+      setIsRecording(false);
     }
   };
 
@@ -1010,85 +1570,149 @@ function App() {
     toggleVideoRecordRef.current = toggleVideoRecord;
   }, [toggleVideoRecord]);
 
-  // Handle direct WebM file download
-  const handleDownloadWebm = () => {
-    if (!webmBlob) return;
-    const url = URL.createObjectURL(webmBlob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${songTitle || 'senux_player'}_render.webm`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+  // Cancel rendering mid-process
+  const cancelRender = () => {
+    isRecordingRef.current = false;
+    setIsRecording(false);
+    setIsPlaying(false);
+    
+    const player = getActivePlayer();
+    if (player) {
+      if (!player.paused) {
+        player.pause();
+      }
+      player.volume = volume; // Restore user's default volume
+    }
+
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+    }
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    setRenderPhase('idle');
   };
 
-  // Convert WebM to MP4 using single-threaded FFmpeg.wasm in browser
-  const handleConvertToMp4 = async () => {
-    if (!webmBlob) return;
-    
-    try {
-      setConversionStatus('loading_ffmpeg');
-      setConversionProgress(0);
+  // Format file size in human readable format
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
 
-      // Load FFmpeg from window object (loaded via index.html script tag)
-      if (!ffmpegRef.current) {
-        if (!window.FFmpeg) {
-          throw new Error("FFmpeg library not loaded from CDN.");
-        }
-        const { createFFmpeg } = window.FFmpeg;
-        ffmpegRef.current = createFFmpeg({
-          log: true,
-          corePath: 'https://unpkg.com/@ffmpeg/core@0.11.0/dist/ffmpeg-core.js'
+  // Download the final rendered file
+  const handleDownloadRender = async () => {
+    if (window.Capacitor && nativeRenderUri) {
+      try {
+        const { Share } = await import('@capacitor/share');
+        await Share.share({
+          title: 'Simpan Video',
+          text: 'Simpan video hasil render Anda',
+          url: nativeRenderUri,
+          dialogTitle: 'Simpan Video'
         });
+      } catch (err) {
+        console.error("Gagal memproses share native:", err);
+        setRenderError('Gagal memproses share: ' + err.message);
       }
+      return;
+    }
 
-      const ffmpeg = ffmpegRef.current;
-      if (!ffmpeg.isLoaded()) {
-        await ffmpeg.load();
+    if (!renderResult) return;
+    const ext = renderResult.type.includes('mp4') ? 'mp4' : 'webm';
+    
+    // Sanitize filename strictly: only allow letters, numbers, dashes, and underscores
+    const sanitizedTitle = (songTitle || 'senux_player')
+      .replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `${sanitizedTitle}_render.${ext}`;
+
+    if (window.Capacitor) {
+      try {
+        setRenderError('Menyiapkan file untuk disimpan...');
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        const { Share } = await import('@capacitor/share');
+
+        const cacheDir = (Directory && Directory.Cache) ? Directory.Cache : 'CACHE';
+
+        // 1. Buat file kosong terlebih dahulu untuk menghindari limit parameter/payload size pada bridge WebView
+        const savedFile = await Filesystem.writeFile({
+          path: filename,
+          data: '',
+          directory: cacheDir,
+          recursive: true
+        });
+
+        if (!savedFile || !savedFile.uri) {
+          throw new Error('Gagal mendapatkan URI file yang disimpan');
+        }
+
+        // 2. Baca Blob sebagai ArrayBuffer, lalu bagi menjadi chunk-chunk binary
+        const reader = new FileReader();
+        reader.readAsArrayBuffer(renderResult);
+        reader.onloadend = async () => {
+          try {
+            const arrayBuffer = reader.result;
+            if (!arrayBuffer) {
+              throw new Error('Gagal membaca data video (empty ArrayBuffer)');
+            }
+
+            const view = new Uint8Array(arrayBuffer);
+            const chunkSize = 32 * 1024; // 32 KB per chunk (aman untuk limit bridge Android WebView mana pun)
+            
+            for (let offset = 0; offset < view.length; offset += chunkSize) {
+              const chunkBytes = view.subarray(offset, offset + chunkSize);
+              
+              // Konversi chunk bytes ke base64 secara aman agar menjadi base64 string yang utuh & valid
+              let binary = '';
+              const chunkLength = chunkBytes.length;
+              for (let i = 0; i < chunkLength; i++) {
+                binary += String.fromCharCode(chunkBytes[i]);
+              }
+              const chunkBase64 = window.btoa(binary);
+
+              setRenderError(`Menyimpan video: ${Math.round((offset / view.length) * 100)}%`);
+
+              await Filesystem.appendFile({
+                path: filename,
+                data: chunkBase64,
+                directory: cacheDir
+              });
+            }
+
+            setRenderError('Menyiapkan dialog simpan...');
+
+            // Tampilkan share dialog Android agar user bisa simpan ke Galeri / Files / kirim
+            await Share.share({
+              title: 'Simpan Video',
+              text: 'Simpan video hasil render Anda',
+              url: savedFile.uri,
+              dialogTitle: 'Simpan Video'
+            });
+            
+            setRenderError('');
+          } catch (err) {
+            console.error("Gagal menyimpan file:", err);
+            setRenderError('Gagal menyimpan: ' + err.message);
+          }
+        };
+      } catch (err) {
+        console.error("Gagal memproses unduhan:", err);
+        setRenderError('Gagal memproses unduhan: ' + err.message);
       }
-
-      // Track progress
-      ffmpeg.setProgress(({ ratio }) => {
-        setConversionProgress(Math.min(99, Math.round(ratio * 100)));
-      });
-
-      setConversionStatus('converting');
-
-      // Write the file into FFmpeg's virtual file system
-      const arrayBuffer = await webmBlob.arrayBuffer();
-      ffmpeg.FS('writeFile', 'input.webm', new Uint8Array(arrayBuffer));
-
-      // Execute conversion: transcode audio to AAC at high-fidelity 320k, copy video track (ultra-fast container swapping)
-      await ffmpeg.run('-i', 'input.webm', '-c:v', 'copy', '-c:a', 'aac', '-b:a', '320k', 'output.mp4');
-
-      // Read output
-      const data = ffmpeg.FS('readFile', 'output.mp4');
-      const mp4Blob = new Blob([data.buffer], { type: 'video/mp4' });
-      const mp4Url = URL.createObjectURL(mp4Blob);
-
-      // Trigger MP4 download
+    } else {
+      const url = URL.createObjectURL(renderResult);
       const a = document.createElement('a');
-      a.href = mp4Url;
-      a.download = `${songTitle || 'senux_player'}_render.mp4`;
+      a.href = url;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-
-      setConversionProgress(100);
-      setConversionStatus('success');
-      
-      // Clean up files in virtual FS to free up browser memory
-      try {
-        ffmpeg.FS('unlink', 'input.webm');
-        ffmpeg.FS('unlink', 'output.mp4');
-      } catch (err) {
-        console.warn("Clean up virtual files warning:", err);
-      }
-    } catch (error) {
-      console.error("FFmpeg conversion error:", error);
-      setConversionStatus('error');
+      URL.revokeObjectURL(url);
     }
   };
+
 
   // Handle focus transition between title and artist inputs to prevent premature auto-close
   const handleContainerBlur = (e) => {
@@ -1105,7 +1729,13 @@ function App() {
         setCurrentTime(player.currentTime);
         // Automatically stop rendering once custom end time limit is met
         if (isRecordingRef.current) {
+          const startSecs = parseTimeToSeconds(renderStartRef.current);
           const limitSecs = parseTimeToSeconds(renderEndRef.current);
+          const totalSecs = limitSecs - startSecs;
+          if (totalSecs > 0) {
+            const currentProgress = Math.min(100, Math.round(((player.currentTime - startSecs) / totalSecs) * 100));
+            setRenderProgress(Math.max(0, currentProgress));
+          }
           if (player.currentTime >= limitSecs) {
             player.pause();
             if (toggleVideoRecordRef.current) {
@@ -1525,8 +2155,17 @@ function App() {
             {/* Middle Playback buttons - centered without star */}
             <div className="control-center">
               <button className="ctrl-btn small">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
-                  <path d="M11 6 L2 12 L11 18 Z M20 6 L11 12 L20 18 Z" />
+                <svg 
+                  viewBox="0 0 24 24" 
+                  width="32" 
+                  height="32" 
+                  fill="white" 
+                  stroke="white" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <path d="M10 6 L2 12 L10 18 Z M20 6 L12 12 L20 18 Z" />
                 </svg>
               </button>
 
@@ -1536,8 +2175,17 @@ function App() {
               </button>
 
               <button className="ctrl-btn small">
-                <svg viewBox="0 0 24 24" width="32" height="32" fill="white">
-                  <path d="M4 6 L13 12 L4 18 Z M13 6 L22 12 L13 18 Z" />
+                <svg 
+                  viewBox="0 0 24 24" 
+                  width="32" 
+                  height="32" 
+                  fill="white" 
+                  stroke="white" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <path d="M4 6 L12 12 L4 18 Z M14 6 L22 12 L14 18 Z" />
                 </svg>
               </button>
             </div>
@@ -1599,97 +2247,179 @@ function App() {
       {/* DOM placeholders to prevent background visualizer scripts (if any) from throwing TypeErrors */}
       <div className="visualizer" style={{ display: 'none' }} />
 
-      {/* Premium Transcode Modal Overlay */}
-      {showModal && (
-        <div className="transcode-modal-overlay">
-          <div className="transcode-modal-card">
-            <button className="close-modal-btn" onClick={() => setShowModal(false)}>×</button>
-            
-            <div className="transcode-header">
-              <span className="success-icon">🎉</span>
-              <h3>Video Berhasil Dirender!</h3>
-              <p>Pilih format unduhan video yang Anda inginkan:</p>
-            </div>
-
-            <div className="conversion-options">
-              {/* Option 1: Direct WebM */}
-              <div className="option-box">
-                <div className="option-info">
-                  <h4>Format WebM (Instan)</h4>
-                  <p>Sangat cepat tanpa loading, langsung siap di-upload ke WhatsApp, TikTok, Instagram, atau YouTube!</p>
+      {/* Render Overlay — Full-screen progress during recording/converting/done */}
+      {renderPhase !== 'idle' && (
+        <div className="render-overlay">
+          {/* Recording Phase */}
+          {renderPhase === 'recording' && (
+            <div className="render-phase-card">
+              <div className="render-phase-icon">
+                <div className="recording-pulse"></div>
+                <i className="fas fa-circle" style={{ color: '#ef4444', fontSize: '14px' }}></i>
+              </div>
+              <h3 className="render-phase-title">Merekam Video...</h3>
+              <div className="render-progress-container">
+                <div className="render-progress-bar">
+                  <div className="render-progress-fill" style={{ width: `${renderProgress}%` }}></div>
                 </div>
-                <button className="option-btn webm-btn" onClick={handleDownloadWebm}>
-                  <i className="fas fa-bolt"></i> Unduh WebM
+                <div className="render-progress-info">
+                  <span>{renderProgress}%</span>
+                  <span>
+                    {estimatedTimeRemaining !== null 
+                      ? `Sisa waktu: ${estimatedTimeRemaining}s` 
+                      : 'Menghitung sisa waktu...'}
+                  </span>
+                </div>
+              </div>
+              <div className="render-specs-badge">
+                <span>{renderResolution}p</span>
+                <span className="specs-dot">·</span>
+                <span>{renderFps} FPS</span>
+                <span className="specs-dot">·</span>
+                <span>{(parseInt(renderBitrate) / 1000).toFixed(1)} Mbps</span>
+              </div>
+              <button className="render-cancel-btn" onClick={cancelRender}>
+                <i className="fas fa-times"></i> Batalkan
+              </button>
+            </div>
+          )}
+
+          {/* Converting Phase */}
+          {renderPhase === 'converting' && (
+            <div className="render-phase-card">
+              <div className="render-phase-icon">
+                <div className="spinner convert-spinner"></div>
+              </div>
+              <h3 className="render-phase-title">Mengkonversi ke MP4...</h3>
+              <div className="render-progress-container">
+                <div className="render-progress-bar">
+                  <div className="render-progress-fill" style={{ width: `${convertProgress}%` }}></div>
+                </div>
+                <div className="render-progress-info">
+                  <span>{convertProgress}%</span>
+                </div>
+              </div>
+              <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', marginTop: '8px' }}>
+                Jangan tutup aplikasi atau layar HP Anda.
+              </p>
+            </div>
+          )}
+
+          {/* Done Phase */}
+          {renderPhase === 'done' && (
+            <div className="render-phase-card">
+              <div className="render-phase-icon">
+                <span className="success-icon" style={{ fontSize: '48px' }}>🎉</span>
+              </div>
+              <h3 className="render-phase-title">Video Berhasil!</h3>
+
+              {renderError && (
+                <div className="render-warning-notice">
+                  <i className="fas fa-exclamation-triangle"></i>
+                  <span>{renderError}</span>
+                </div>
+              )}
+
+              <div className="render-result-info">
+                <div className="result-info-row">
+                  <span className="result-label">Format</span>
+                  <span className="result-value">MP4</span>
+                </div>
+                <div className="result-info-row">
+                  <span className="result-label">Resolusi</span>
+                  <span className="result-value">{renderResolution}p</span>
+                </div>
+                <div className="result-info-row">
+                  <span className="result-label">FPS</span>
+                  <span className="result-value">{renderFps}</span>
+                </div>
+                <div className="result-info-row">
+                  <span className="result-label">Durasi</span>
+                  <span className="result-value">{renderStart} → {renderEnd}</span>
+                </div>
+                <div className="result-info-row">
+                  <span className="result-label">Ukuran</span>
+                  <span className="result-value">{formatFileSize(renderFileSize)}</span>
+                </div>
+              </div>
+
+              <button className="render-download-btn" onClick={handleDownloadRender}>
+                <i className="fas fa-download"></i> Unduh MP4
+              </button>
+
+              <div className="render-done-actions">
+                <button className="render-action-btn" onClick={() => setRenderPhase('idle')}>
+                  Tutup
+                </button>
+                <button className="render-action-btn" onClick={() => {
+                  setRenderPhase('idle');
+                  toggleVideoRecord();
+                }}>
+                  <i className="fas fa-sync-alt"></i> Render Lagi
                 </button>
               </div>
+            </div>
+          )}
 
-              {/* Option 2: Transcode to MP4 */}
-              <div className="option-box">
-                <div className="option-info">
-                  <h4>Format MP4 (Untuk Galeri HP)</h4>
-                  {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? (
-                    <div className="mobile-warning-box">
-                      <p className="warning-text">⚠️ <strong>Peringatan HP/Mobile:</strong></p>
-                      <p className="warning-desc">Proses konversi MP4 di browser HP membutuhkan RAM sangat besar dan **sering membuat browser HP crash/menutup sendiri**.</p>
-                      <p className="recommend-text">💡 <strong>Sangat Disarankan:</strong> Unduh format <strong>WebM (Instan)</strong> di atas, lalu kirim ke WhatsApp atau upload ke IG/TikTok. Sosmed akan mengubahnya ke MP4 secara otomatis!</p>
-                    </div>
-                  ) : (
-                    <p>Mengonversi WebM ke MP4 agar bisa disimpan langsung di galeri handphone Anda offline.</p>
+          {/* Error Phase */}
+          {renderPhase === 'error' && (
+            <div className="render-phase-card">
+              <div className="render-phase-icon">
+                <i className="fas fa-exclamation-circle" style={{ color: '#ef4444', fontSize: '48px' }}></i>
+              </div>
+              <h3 className="render-phase-title">Render Gagal</h3>
+              <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13.5px', margin: '12px 0', textAlign: 'center' }}>
+                {renderError || 'Terjadi kesalahan saat merender video. Silakan coba lagi.'}
+              </p>
+              
+              {renderErrorDetails && (
+                <div style={{ width: '100%', marginTop: '5px', marginBottom: '15px', textAlign: 'left' }}>
+                  <button 
+                    onClick={() => setShowErrorDetails(!showErrorDetails)}
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: 'rgba(255, 255, 255, 0.45)',
+                      fontSize: '11px',
+                      textDecoration: 'underline',
+                      cursor: 'pointer',
+                      padding: 0
+                    }}
+                  >
+                    {showErrorDetails ? 'Sembunyikan Log Error' : 'Lihat Log Error'}
+                  </button>
+                  {showErrorDetails && (
+                    <pre style={{
+                      background: 'rgba(0, 0, 0, 0.4)',
+                      padding: '10px',
+                      borderRadius: '8px',
+                      fontSize: '10px',
+                      color: '#ff8888',
+                      overflowX: 'auto',
+                      maxHeight: '120px',
+                      whiteSpace: 'pre-wrap',
+                      marginTop: '8px',
+                      fontFamily: 'monospace'
+                    }}>
+                      {renderErrorDetails}
+                    </pre>
                   )}
                 </div>
+              )}
 
-                {conversionStatus === 'idle' && (
-                  <button className="option-btn mp4-btn" onClick={handleConvertToMp4}>
-                    {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ? (
-                      <>
-                        <i className="fas fa-exclamation-triangle"></i> Tetap Paksa Konversi MP4
-                      </>
-                    ) : (
-                      <>
-                        <i className="fas fa-sync-alt"></i> Konversi ke MP4
-                      </>
-                    )}
-                  </button>
-                )}
-
-                {conversionStatus === 'loading_ffmpeg' && (
-                  <div className="conversion-status-loading">
-                    <div className="spinner"></div>
-                    <span>Menyiapkan Engine Konverter...</span>
-                  </div>
-                )}
-
-                {conversionStatus === 'converting' && (
-                  <div className="conversion-status-progress">
-                    <div className="progress-bar-container">
-                      <div className="progress-bar-fill" style={{ width: `${conversionProgress}%` }}></div>
-                    </div>
-                    <span>Mengonversi ke MP4: {conversionProgress}%</span>
-                  </div>
-                )}
-
-                {conversionStatus === 'success' && (
-                  <div className="conversion-status-success">
-                    <i className="fas fa-check-circle"></i>
-                    <span>Konversi Berhasil! MP4 telah diunduh.</span>
-                    <button className="option-btn mp4-btn reset-btn" onClick={() => setConversionStatus('idle')}>
-                      Konversi Ulang
-                    </button>
-                  </div>
-                )}
-
-                {conversionStatus === 'error' && (
-                  <div className="conversion-status-error">
-                    <i className="fas fa-exclamation-circle"></i>
-                    <span>Konversi gagal. Coba format WebM (Instan).</span>
-                    <button className="option-btn mp4-btn reset-btn" onClick={handleConvertToMp4}>
-                      Coba Lagi
-                    </button>
-                  </div>
-                )}
+              <div className="render-done-actions">
+                <button className="render-action-btn" onClick={() => setRenderPhase('idle')}>
+                  Tutup
+                </button>
+                <button className="render-action-btn" onClick={() => {
+                  setRenderPhase('idle');
+                  toggleVideoRecord();
+                }}>
+                  Coba Lagi
+                </button>
               </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
