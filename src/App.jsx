@@ -653,11 +653,11 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
       ctx.font = '500 18px Inter';
       ctx.textAlign = 'left';
-      ctx.fillText(formatTime(curT), cardX + artPadding, seekY + 44);
+      ctx.fillText(formatTime(curT), cardX + artPadding, seekY + 48);
       
       ctx.textAlign = 'right';
       const remainingTime = dur > 0 ? (dur - curT) : 0;
-      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 44);
+      ctx.fillText(`-${formatTime(remainingTime)}`, cardX + cardWidth - artPadding, seekY + 48);
       // 6. Navigation Controls (Skip buttons, Play/Pause - perfectly centered)
       const ctrlY = seekY + 90;
       const btnCenter = cardX + cardWidth / 2;
@@ -1256,10 +1256,10 @@ function App() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
         ctx.font = '500 18px Inter';
         ctx.textAlign = 'left';
-        ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 44);
+        ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 48);
 
         ctx.textAlign = 'right';
-        ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, cardX + cardWidth - artPadding, seekY + 44);
+        ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, cardX + cardWidth - artPadding, seekY + 48);
 
         // Navigation Controls (Skip, Pause)
         const ctrlY = seekY + 90;
