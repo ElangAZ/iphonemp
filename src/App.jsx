@@ -777,12 +777,12 @@ function App() {
       // Left low-volume speaker icon (Scaled up by 1.8x)
       if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
         ctx.save();
-        ctx.translate(volX - 42, volY - 8.0);
+        ctx.translate(volX - 38, volY - 4.8);
         ctx.scale(1.8, 1.8);
         ctx.globalAlpha = 0.45;
         const img = volumeLowImgRef.current;
         const ratio = img.naturalWidth / img.naturalHeight;
-        ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
+        ctx.drawImage(img, 0, 0, 11.0 * ratio, 11.0);
         ctx.restore();
       } else {
         ctx.save();
@@ -1354,12 +1354,12 @@ function App() {
 
         if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
           ctx.save();
-          ctx.translate(volX - 42, volY - 8.0);
+          ctx.translate(volX - 38, volY - 4.8);
           ctx.scale(1.8, 1.8);
           ctx.globalAlpha = 0.45;
           const img = volumeLowImgRef.current;
           const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
+          ctx.drawImage(img, 0, 0, 11.0 * ratio, 11.0);
           ctx.restore();
         } else {
           ctx.save();
@@ -2221,7 +2221,7 @@ function App() {
 
           {/* Volume seek section with sleek speaker SVGs */}
           <div className="volume-section">
-            <img className="volume-icon" src="/volume-low.png" alt="Volume Low" style={{ opacity: 0.45 }} />
+            <img className="volume-icon volume-icon-low" src="/volume-low.png" alt="Volume Low" style={{ opacity: 0.45 }} />
             <div className="volume-track" onClick={handleVolumeChange}>
               <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
             </div>
