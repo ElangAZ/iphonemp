@@ -1042,7 +1042,7 @@ function App() {
 
       const fps = parseInt(renderFps, 10);
       encoder.configure({
-        codec: 'vp9',
+        codec: 'vp09.00.10.08',
         width: canvas.width,
         height: canvas.height,
         bitrate: parseInt(renderBitrate, 10) * 1000
