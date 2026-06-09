@@ -1789,7 +1789,11 @@ function App() {
 
     const handleLoadedMetadata = () => {
       const player = getActivePlayer();
-      if (player) setDuration(player.duration);
+      if (player) {
+        setDuration(player.duration);
+        setRenderStart('0:00');
+        setRenderEnd(formatTime(player.duration));
+      }
     };
 
     const handleEnded = () => {
