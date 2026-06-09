@@ -72,6 +72,24 @@ function App() {
     audioFadeDurationRef.current = audioFadeDuration;
   }, [isRecording, renderStart, renderEnd, isAudioFadeEnabled, audioFadeDuration]);
 
+  const volumeIconRef = useRef(null);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = '/volume-high.png';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 24;
+      canvas.height = 24;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, 24, 24);
+      ctx.globalCompositeOperation = 'source-in';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, 24, 24);
+      volumeIconRef.current = canvas;
+    };
+  }, []);
+
   // Web Audio refs for recording
   const audioContextRef = useRef(null);
   const audioSourceRef = useRef(null);
@@ -787,38 +805,45 @@ function App() {
 
       // Right high-volume speaker icon with waves (Scaled up by 1.8x)
       ctx.save();
-      ctx.translate(volX + volWidth + 14, volY - 16.6);
-      ctx.scale(1.8, 1.8);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.lineWidth = 1.8;
-      ctx.lineCap = 'round';
-      
-      // Speaker body
-      ctx.beginPath();
-      ctx.moveTo(9, 6);
-      ctx.lineTo(5, 9);
-      ctx.lineTo(2, 9);
-      ctx.lineTo(2, 15);
-      ctx.lineTo(5, 15);
-      ctx.lineTo(9, 18);
-      ctx.closePath();
-      ctx.fill();
+      if (volumeIconRef.current) {
+        ctx.translate(volX + volWidth + 14, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.globalAlpha = 0.45;
+        ctx.drawImage(volumeIconRef.current, 0, 0, 24, 24);
+      } else {
+        ctx.translate(volX + volWidth + 14, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        
+        // Speaker body
+        ctx.beginPath();
+        ctx.moveTo(9, 6);
+        ctx.lineTo(5, 9);
+        ctx.lineTo(2, 9);
+        ctx.lineTo(2, 15);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(9, 18);
+        ctx.closePath();
+        ctx.fill();
 
-      // Wave Arc 1
-      ctx.beginPath();
-      ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
-      ctx.stroke();
+        // Wave Arc 1
+        ctx.beginPath();
+        ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
 
-      // Wave Arc 2
-      ctx.beginPath();
-      ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
-      ctx.stroke();
+        // Wave Arc 2
+        ctx.beginPath();
+        ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
 
-      // Wave Arc 3
-      ctx.beginPath();
-      ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
-      ctx.stroke();
+        // Wave Arc 3
+        ctx.beginPath();
+        ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
+        ctx.stroke();
+      }
       ctx.restore();
       
       // 8. Device selector pill button at the bottom center (Dynamic centering & width based on custom name)
@@ -1394,30 +1419,37 @@ function App() {
         ctx.fill();
 
         ctx.save();
-        ctx.translate(volX + volWidth + 14, volY - 16.6);
-        ctx.scale(1.8, 1.8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.lineWidth = 1.8;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(9, 6);
-        ctx.lineTo(5, 9);
-        ctx.lineTo(2, 9);
-        ctx.lineTo(2, 15);
-        ctx.lineTo(5, 15);
-        ctx.lineTo(9, 18);
-        ctx.closePath();
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
-        ctx.stroke();
+        if (volumeIconRef.current) {
+          ctx.translate(volX + volWidth + 14, volY - 16.6);
+          ctx.scale(1.8, 1.8);
+          ctx.globalAlpha = 0.45;
+          ctx.drawImage(volumeIconRef.current, 0, 0, 24, 24);
+        } else {
+          ctx.translate(volX + volWidth + 14, volY - 16.6);
+          ctx.scale(1.8, 1.8);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 1.8;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(9, 6);
+          ctx.lineTo(5, 9);
+          ctx.lineTo(2, 9);
+          ctx.lineTo(2, 15);
+          ctx.lineTo(5, 15);
+          ctx.lineTo(9, 18);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(9, 12, 5, -Math.PI / 3, Math.PI / 3);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(9, 12, 9, -Math.PI / 3, Math.PI / 3);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(9, 12, 13, -Math.PI / 3, Math.PI / 3);
+          ctx.stroke();
+        }
         ctx.restore();
 
         // Device Selector Pill
@@ -2292,12 +2324,12 @@ function App() {
             <div className="volume-track" onClick={handleVolumeChange}>
               <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
             </div>
-            <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11 5 L6 9 H2v6h4l5 4V5z" />
-              <path d="M 13.0 7.67 A 5 5 0 0 1 13.0 16.33" fill="none" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M 14.75 4.64 A 8.5 8.5 0 0 1 14.75 19.36" fill="none" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M 16.5 1.61 A 12 12 0 0 1 16.5 22.39" fill="none" style={{ fill: 'none' }} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
+            <img 
+              className="volume-icon" 
+              src="/volume-high.png" 
+              alt="volume" 
+              style={{ opacity: 0.45, filter: 'brightness(0) invert(1)' }} 
+            />
           </div>
 
           {/* Bottom Device Selector Pill */}
