@@ -777,12 +777,12 @@ function App() {
       // Left low-volume speaker icon (Scaled up by 1.8x)
       if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
         ctx.save();
-        ctx.translate(volX - 42, volY - 5.8);
+        ctx.translate(volX - 42, volY - 8.0);
         ctx.scale(1.8, 1.8);
         ctx.globalAlpha = 0.45;
         const img = volumeLowImgRef.current;
         const ratio = img.naturalWidth / img.naturalHeight;
-        ctx.drawImage(img, 0, 0, 12 * ratio, 12);
+        ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
         ctx.restore();
       } else {
         ctx.save();
@@ -816,12 +816,12 @@ function App() {
       // Right high-volume speaker icon (Scaled up by 1.8x)
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
         ctx.save();
-        ctx.translate(volX + volWidth + 14, volY - 5.8);
+        ctx.translate(volX + volWidth + 14, volY - 8.0);
         ctx.scale(1.8, 1.8);
         ctx.globalAlpha = 0.45;
         const img = volumeHighImgRef.current;
         const ratio = img.naturalWidth / img.naturalHeight;
-        ctx.drawImage(img, 0, 0, 12 * ratio, 12);
+        ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
         ctx.restore();
       }
       
@@ -1354,12 +1354,12 @@ function App() {
 
         if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
           ctx.save();
-          ctx.translate(volX - 42, volY - 5.8);
+          ctx.translate(volX - 42, volY - 8.0);
           ctx.scale(1.8, 1.8);
           ctx.globalAlpha = 0.45;
           const img = volumeLowImgRef.current;
           const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, 0, 0, 12 * ratio, 12);
+          ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
           ctx.restore();
         } else {
           ctx.save();
@@ -1391,12 +1391,12 @@ function App() {
         // Right high-volume speaker icon (Scaled up by 1.8x)
         if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
           ctx.save();
-          ctx.translate(volX + volWidth + 14, volY - 5.8);
+          ctx.translate(volX + volWidth + 14, volY - 8.0);
           ctx.scale(1.8, 1.8);
           ctx.globalAlpha = 0.45;
           const img = volumeHighImgRef.current;
           const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, 0, 0, 12 * ratio, 12);
+          ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
           ctx.restore();
         }
 

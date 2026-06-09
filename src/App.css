@@ -418,8 +418,8 @@ body {
 }
 
 .volume-icon {
-  width: 24px;
-  height: 24px;
+  width: 28px;
+  height: 28px;
   color: rgba(255, 255, 255, 0.45);
   fill: rgba(255, 255, 255, 0.45);
   display: flex;
