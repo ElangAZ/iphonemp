@@ -58,6 +58,7 @@ function App() {
   const containerRef = useRef(null);
   const airplayImgRef = useRef(null);
   const volumeHighImgRef = useRef(null);
+  const volumeLowImgRef = useRef(null);
 
   useEffect(() => {
     const airplay = new Image();
@@ -67,6 +68,10 @@ function App() {
     const vol = new Image();
     vol.src = '/volume-high.png';
     volumeHighImgRef.current = vol;
+
+    const volLow = new Image();
+    volLow.src = '/volume-low.png';
+    volumeLowImgRef.current = volLow;
   }, []);
 
   const isRecordingRef = useRef(isRecording);
@@ -770,20 +775,31 @@ function App() {
       const volWidth = cardWidth - (artPadding * 2) - 96;
       
       // Left low-volume speaker icon (Scaled up by 1.8x)
-      ctx.save();
-      ctx.translate(volX - 42, volY - 16.6);
-      ctx.scale(1.8, 1.8);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-      ctx.beginPath();
-      ctx.moveTo(9, 6);
-      ctx.lineTo(5, 9);
-      ctx.lineTo(2, 9);
-      ctx.lineTo(2, 15);
-      ctx.lineTo(5, 15);
-      ctx.lineTo(9, 18);
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+      if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
+        ctx.save();
+        ctx.translate(volX - 42, volY - 5.8);
+        ctx.scale(1.8, 1.8);
+        ctx.globalAlpha = 0.45;
+        const img = volumeLowImgRef.current;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        ctx.drawImage(img, 0, 0, 12 * ratio, 12);
+        ctx.restore();
+      } else {
+        ctx.save();
+        ctx.translate(volX - 42, volY - 16.6);
+        ctx.scale(1.8, 1.8);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.beginPath();
+        ctx.moveTo(9, 6);
+        ctx.lineTo(5, 9);
+        ctx.lineTo(2, 9);
+        ctx.lineTo(2, 15);
+        ctx.lineTo(5, 15);
+        ctx.lineTo(9, 18);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
 
       // Volume track bg
       ctx.beginPath();
@@ -1336,20 +1352,31 @@ function App() {
         const volX = cardX + artPadding + 48;
         const volWidth = cardWidth - (artPadding * 2) - 96;
 
-        ctx.save();
-        ctx.translate(volX - 42, volY - 16.6);
-        ctx.scale(1.8, 1.8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.beginPath();
-        ctx.moveTo(9, 6);
-        ctx.lineTo(5, 9);
-        ctx.lineTo(2, 9);
-        ctx.lineTo(2, 15);
-        ctx.lineTo(5, 15);
-        ctx.lineTo(9, 18);
-        ctx.closePath();
-        ctx.fill();
-        ctx.restore();
+        if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
+          ctx.save();
+          ctx.translate(volX - 42, volY - 5.8);
+          ctx.scale(1.8, 1.8);
+          ctx.globalAlpha = 0.45;
+          const img = volumeLowImgRef.current;
+          const ratio = img.naturalWidth / img.naturalHeight;
+          ctx.drawImage(img, 0, 0, 12 * ratio, 12);
+          ctx.restore();
+        } else {
+          ctx.save();
+          ctx.translate(volX - 42, volY - 16.6);
+          ctx.scale(1.8, 1.8);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.beginPath();
+          ctx.moveTo(9, 6);
+          ctx.lineTo(5, 9);
+          ctx.lineTo(2, 9);
+          ctx.lineTo(2, 15);
+          ctx.lineTo(5, 15);
+          ctx.lineTo(9, 18);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
 
         ctx.beginPath();
         ctx.roundRect(volX, volY, volWidth, 10, 5);
@@ -2219,18 +2246,11 @@ function App() {
 
           {/* Volume seek section with sleek speaker SVGs */}
           <div className="volume-section">
-            <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M3.667 8.167h3.5l4.666-4.667v17l-4.666-4.667h-3.5v-7.666z"/>
-            </svg>
+            <img className="volume-icon" src="/volume-low.png" alt="Volume Low" style={{ opacity: 0.45 }} />
             <div className="volume-track" onClick={handleVolumeChange}>
               <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
             </div>
-            <svg className="volume-icon" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11 5 L6 9 H2v6h4l5 4V5z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
-              <path d="M15.54 8.46a5 5 0 0 1 0 7.07" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M19.07 4.93a10 10 0 0 1 0 14.14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              <path d="M22.6 1.4a15 15 0 0 1 0 21.2" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
+            <img className="volume-icon" src="/volume-high.png" alt="Volume High" style={{ opacity: 0.45 }} />
           </div>
 
           {/* Bottom Device Selector Pill */}
