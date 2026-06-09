@@ -828,7 +828,7 @@ function App() {
       if (airplayImgRef.current && airplayImgRef.current.complete) {
         ctx.save();
         ctx.translate(pillX + 32 + 10, pillY + 26);
-        ctx.scale(1.2, 1.2);
+        ctx.scale(0.9, 0.9);
         ctx.globalAlpha = 1.0;
         const img = airplayImgRef.current;
         const ratio = img.naturalWidth / img.naturalHeight;
@@ -1389,7 +1389,7 @@ function App() {
         if (airplayImgRef.current && airplayImgRef.current.complete) {
           ctx.save();
           ctx.translate(pillX + 32 + 10, pillY + 26);
-          ctx.scale(1.2, 1.2);
+          ctx.scale(0.9, 0.9);
           ctx.globalAlpha = 1.0;
           const img = airplayImgRef.current;
           const ratio = img.naturalWidth / img.naturalHeight;
@@ -2263,12 +2263,7 @@ function App() {
                 onClick={() => setIsEditingDevice(true)} 
                 title="Klik untuk ganti nama device"
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" style={{ fill: 'none' }}>
-                  <path d="M9.1 16 A 5 5 0 1 1 14.9 16" />
-                  <path d="M6.7 19.2 A 9 9 0 1 1 17.3 19.2" />
-                  <path d="M4.3 22.4 A 13 13 0 1 1 19.7 22.4" />
-                  <polygon points="12 12 5.5 20.5 18.5 20.5" fill="currentColor" stroke="none" />
-                </svg>
+                <img src="/airplay.png" alt="AirPlay" style={{ width: '13px', height: '13px', marginRight: '4px' }} />
                 <span>{deviceName}</span>
               </button>
             )}
