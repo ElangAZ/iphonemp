@@ -1606,16 +1606,41 @@ function App() {
   const handleDownloadRender = async () => {
     if (window.Capacitor && nativeRenderUri) {
       try {
-        const { Share } = await import('@capacitor/share');
-        await Share.share({
-          title: 'Simpan Video',
-          text: 'Simpan video hasil render Anda',
-          url: nativeRenderUri,
-          dialogTitle: 'Simpan Video'
+        setRenderError('Menyimpan ke folder Download...');
+        const { registerPlugin } = await import('@capacitor/core');
+        const VideoTranscoder = registerPlugin('VideoTranscoder');
+        
+        const sanitizedTitle = (songTitle || 'senux_player').replace(/[^a-zA-Z0-9_-]/g, '_');
+        const filename = `${sanitizedTitle}_render.mp4`;
+
+        const result = await VideoTranscoder.saveToDownloads({
+          videoPath: nativeRenderUri,
+          filename: filename
         });
+        
+        if (result.success) {
+          setRenderError('');
+          alert('Video berhasil disimpan di folder Download ponsel Anda!');
+        } else {
+          throw new Error('Gagal menyimpan file.');
+        }
       } catch (err) {
-        console.error("Gagal memproses share native:", err);
-        setRenderError('Gagal memproses share: ' + err.message);
+        console.error("Gagal menyimpan ke folder Download:", err);
+        setRenderError('Gagal menyimpan: ' + err.message);
+        
+        // Fallback to share sheet if direct save fails
+        try {
+          const { Share } = await import('@capacitor/share');
+          await Share.share({
+            title: 'Simpan Video',
+            text: 'Simpan video hasil render Anda',
+            url: nativeRenderUri,
+            dialogTitle: 'Simpan Video'
+          });
+          setRenderError('');
+        } catch (shareErr) {
+          console.error("Gagal share fallback:", shareErr);
+        }
       }
       return;
     }

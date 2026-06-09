@@ -130,4 +130,71 @@ public class VideoTranscoderPlugin extends Plugin {
             call.reject("Failed to parse paths: " + e.getMessage(), e);
         }
     }
+
+    @PluginMethod
+    public void saveToDownloads(PluginCall call) {
+        String videoPath = call.getString("videoPath");
+        String filename = call.getString("filename");
+
+        if (videoPath == null || filename == null) {
+            call.reject("Video path or filename is null");
+            return;
+        }
+
+        try {
+            File sourceFile = videoPath.startsWith("file://") ? new File(Uri.parse(videoPath).getPath()) : new File(videoPath);
+            if (!sourceFile.exists()) {
+                call.reject("Source file does not exist: " + sourceFile.getAbsolutePath());
+                return;
+            }
+
+            Uri uri = null;
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+                android.content.ContentValues values = new android.content.ContentValues();
+                values.put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, filename);
+                values.put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "video/mp4");
+                values.put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH, android.os.Environment.DIRECTORY_DOWNLOADS);
+
+                android.content.ContentResolver resolver = getContext().getContentResolver();
+                uri = resolver.insert(android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI, values);
+
+                if (uri != null) {
+                    try (java.io.OutputStream out = resolver.openOutputStream(uri);
+                         java.io.FileInputStream in = new java.io.FileInputStream(sourceFile)) {
+                        byte[] buffer = new byte[8192];
+                        int bytesRead;
+                        while ((bytesRead = in.read(buffer)) != -1) {
+                            out.write(buffer, 0, bytesRead);
+                        }
+                    }
+                }
+            } else {
+                File downloadsDir = android.os.Environment.getExternalStoragePublicDirectory(android.os.Environment.DIRECTORY_DOWNLOADS);
+                if (!downloadsDir.exists()) {
+                    downloadsDir.mkdirs();
+                }
+                File destFile = new File(downloadsDir, filename);
+                try (java.io.FileOutputStream out = new java.io.FileOutputStream(destFile);
+                     java.io.FileInputStream in = new java.io.FileInputStream(sourceFile)) {
+                    byte[] buffer = new byte[8192];
+                    int bytesRead;
+                    while ((bytesRead = in.read(buffer)) != -1) {
+                        out.write(buffer, 0, bytesRead);
+                    }
+                }
+                uri = Uri.fromFile(destFile);
+            }
+
+            if (uri != null) {
+                JSObject ret = new JSObject();
+                ret.put("success", true);
+                ret.put("uri", uri.toString());
+                call.resolve(ret);
+            } else {
+                call.reject("Failed to save file to downloads");
+            }
+        } catch (Exception e) {
+            call.reject("Failed to save to downloads: " + e.getMessage(), e);
+        }
+    }
 }
