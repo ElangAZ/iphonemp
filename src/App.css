@@ -425,6 +425,7 @@ body {
   display: flex;
   align-items: center;
   flex-shrink: 0;
+  object-fit: contain;
 }
 
 .volume-track {
