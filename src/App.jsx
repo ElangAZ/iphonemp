@@ -1112,17 +1112,22 @@ function App() {
         coverImgObj.src = captureCanvas.toDataURL('image/jpeg', 0.8);
         await new Promise(r => { coverImgObj.onload = r; if (coverImgObj.complete) r(); });
 
-        // Create dedicated video element for frame-accurate cover rendering
+        // Create dedicated video element — play it live to avoid per-frame seek flicker
         coverVidEl = document.createElement('video');
         coverVidEl.src = artworkUrl;
         coverVidEl.muted = true;
         coverVidEl.playsInline = true;
+        coverVidEl.loop = true;
         coverVidEl.preload = 'auto';
         await new Promise(r => {
           coverVidEl.onloadeddata = r;
           coverVidEl.onerror = r;
           coverVidEl.load();
         });
+        // Start video playing from the beginning so frames are available
+        coverVidEl.currentTime = 0;
+        await new Promise(r => { coverVidEl.onseeked = r; setTimeout(r, 100); });
+        coverVidEl.play().catch(() => {});
       } else {
         const domImg = document.querySelector('.artwork-img');
         if (domImg && domImg.src && domImg.naturalWidth > 0) {
@@ -1312,12 +1317,8 @@ function App() {
         const artY = cardY + artPadding;
         const artRadius = 20;
 
-        if (coverVidEl && coverVidEl.readyState >= 2 && coverVidEl.duration > 0) {
-          // Seek cover video to looped position for this frame
-          const loopedTime = (currentTime - start) % coverVidEl.duration;
-          coverVidEl.currentTime = loopedTime;
-          await new Promise(r => { coverVidEl.onseeked = r; setTimeout(r, 30); });
-
+        if (coverVidEl && coverVidEl.readyState >= 2) {
+          // Video is playing live — just draw current frame directly (no seek = no flicker)
           ctx.save();
           ctx.beginPath();
           ctx.roundRect(artX, artY, artSize, artSize, artRadius);
@@ -2306,16 +2307,7 @@ function App() {
 
       {/* Core Player UI Card wrapper */}
       <div className={`player-wrap ${playerOrientation === 'landscape' ? 'landscape-mode' : 'portrait-mode'}`}>
-        <GlassSurface
-          borderRadius={55}
-          className="player"
-          backgroundOpacity={0}
-          saturation={1.8}
-          distortionScale={-180}
-          brightness={50}
-          opacity={0.93}
-          blur={11}
-        >
+        <div className="player">
           {/* Card Artwork area */}
           <div className="artwork-section">
             <div className="artwork-container">
@@ -2367,7 +2359,7 @@ function App() {
                 </div>
               )}
             </div>
-          </div>
+          </div> {/* artwork-section */}
 
           <div className="player-details">
             {/* Song Info */}
@@ -2530,7 +2522,7 @@ function App() {
               )}
             </div>
           </div>
-        </GlassSurface>
+        </div>
       </div>
 
       {/* DOM placeholders to prevent background visualizer scripts (if any) from throwing TypeErrors */}
@@ -2586,15 +2578,8 @@ function App() {
                       )}
 
                       {/* Floating player card */}
-                      <GlassSurface
-                        borderRadius={18}
+                      <div
                         className="editor-preview-card"
-                        backgroundOpacity={0}
-                        saturation={1.8}
-                        distortionScale={-180}
-                        brightness={50}
-                        opacity={0.93}
-                        blur={11}
                       >
                         <div className="editor-preview-card-art">
                           {artworkUrl ? (
@@ -2656,7 +2641,7 @@ function App() {
                             <span>{deviceName}</span>
                           </div>
                         </div>
-                      </GlassSurface>
+                      </div>
                     </div>
                   </div>
                 </div>

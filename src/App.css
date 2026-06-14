@@ -111,12 +111,19 @@ video.bg-artwork-overlay.bg-cover-video {
   width: 90vw;
   max-width: 390px;
   height: auto;
-  background: rgba(15, 15, 15, 0.45);
-  backdrop-filter: blur(50px);
-  -webkit-backdrop-filter: blur(50px);
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.06) 0%,
+    rgba(0, 0, 0, 0.30) 100%
+  );
+  backdrop-filter: blur(60px) saturate(1.6);
+  -webkit-backdrop-filter: blur(60px) saturate(1.6);
   border-radius: 55px;
-  border: none;
-  box-shadow: 0 60px 120px rgba(0,0,0,0.90);
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  box-shadow:
+    0 60px 120px rgba(0, 0, 0, 0.90),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.20);
   padding: 0;
   overflow: hidden;
   position: relative;
@@ -2375,41 +2382,27 @@ video.bg-artwork-overlay.bg-cover-video {
   }
 }
 
-/* GlassSurface overrides for Player and Preview cards */
-.player.glass-surface {
-  width: 90vw;
-  max-width: 390px;
-  height: auto;
-  box-shadow: 0 60px 120px rgba(0,0,0,0.90);
-  border: none;
-  background: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-}
 
-.player.glass-surface .glass-surface__content {
-  flex-direction: column;
-  align-items: stretch;
-  justify-content: flex-start;
-  padding: 0;
-  height: auto !important;
-}
-
-.editor-preview-card.glass-surface {
+/* Editor preview floating card */
+.editor-preview-card {
   width: 155px;
-  background: none !important;
-  border: none !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
-  padding: 0;
-  transition: all 0.3s ease;
-}
-
-.editor-preview-card.glass-surface .glass-surface__content {
+  background: linear-gradient(
+    145deg,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(0, 0, 0, 0.32) 100%
+  );
+  backdrop-filter: blur(40px) saturate(1.6);
+  -webkit-backdrop-filter: blur(40px) saturate(1.6);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 15px 35px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
-  padding: 14px;
-  height: auto !important;
+  transition: all 0.3s ease;
+  overflow: hidden;
 }
