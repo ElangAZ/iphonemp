@@ -1209,6 +1209,8 @@ function App() {
       const videoSmoothHeights = new Array(6).fill(0);
       const prevMagnitudes = new Float32Array(256);
       const renderStartTime = performance.now();
+      let renderScrollOffset = 0;
+      let renderScrollPauseTicks = Math.round(2 * fps);
 
       // Draw loop
       while (currentTime < end) {
@@ -1291,16 +1293,57 @@ function App() {
 
         const maxTextWidth = cardWidth - (artPadding * 2) - 80;
         const titleWidth = ctx.measureText(songTitle).width;
-        let displayTitle = songTitle;
+        
         if (titleWidth > maxTextWidth) {
-          let len = songTitle.length;
-          while (len > 0 && ctx.measureText(displayTitle + '...').width > maxTextWidth) {
-            len--;
-            displayTitle = songTitle.substring(0, len);
+          // Clear offscreen canvas
+          offCtx.clearRect(0, 0, maxTextWidth, 60);
+          offCtx.globalCompositeOperation = 'source-over';
+          
+          // Draw scrolling text on offscreen canvas
+          offCtx.fillStyle = '#ffffff';
+          offCtx.font = '800 22px Inter';
+          offCtx.textAlign = 'left';
+          offCtx.textBaseline = 'middle';
+          
+          const textY = 30;
+          offCtx.fillText(songTitle, renderScrollOffset, textY);
+          offCtx.fillText(songTitle, renderScrollOffset + titleWidth + 100, textY);
+          
+          // Mask
+          offCtx.globalCompositeOperation = 'destination-in';
+          const grad = offCtx.createLinearGradient(0, 0, maxTextWidth, 0);
+          
+          if (renderScrollPauseTicks > 0 || Math.abs(renderScrollOffset) < 1) {
+            grad.addColorStop(0, 'rgba(0,0,0,1)');
+            grad.addColorStop(0.9, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
+          } else {
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(0.08, 'rgba(0,0,0,1)');
+            grad.addColorStop(0.92, 'rgba(0,0,0,1)');
+            grad.addColorStop(1, 'rgba(0,0,0,0)');
           }
-          displayTitle += '...';
+          
+          offCtx.fillStyle = grad;
+          offCtx.fillRect(0, 0, maxTextWidth, 60);
+          
+          // Draw to main canvas
+          ctx.drawImage(offCanvas, 0, 0, maxTextWidth, 60, cardX + artPadding, infoY - 30, maxTextWidth, 60);
+          
+          // Update scroll offset for next frame
+          const scrollStep = 36 / fps;
+          if (renderScrollPauseTicks > 0) {
+            renderScrollPauseTicks--;
+          } else {
+            renderScrollOffset -= scrollStep;
+            if (Math.abs(renderScrollOffset) >= titleWidth + 100) {
+              renderScrollOffset = 0;
+              renderScrollPauseTicks = Math.round(2 * fps);
+            }
+          }
+        } else {
+          ctx.fillText(songTitle, cardX + artPadding, infoY);
         }
-        ctx.fillText(displayTitle, cardX + artPadding, infoY);
 
         ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
         ctx.font = '500 20px Inter';
