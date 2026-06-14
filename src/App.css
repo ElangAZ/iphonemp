@@ -113,17 +113,17 @@ video.bg-artwork-overlay.bg-cover-video {
   height: auto;
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.06) 0%,
-    rgba(0, 0, 0, 0.30) 100%
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(0, 0, 0, 0.40) 100%
   );
-  backdrop-filter: blur(60px) saturate(1.6);
-  -webkit-backdrop-filter: blur(60px) saturate(1.6);
+  backdrop-filter: blur(60px) saturate(1.1);
+  -webkit-backdrop-filter: blur(60px) saturate(1.1);
   border-radius: 55px;
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 60px 120px rgba(0, 0, 0, 0.90),
-    inset 0 1px 0 rgba(255, 255, 255, 0.10),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.20);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.30);
   padding: 0;
   overflow: hidden;
   position: relative;
@@ -2388,15 +2388,15 @@ video.bg-artwork-overlay.bg-cover-video {
   width: 155px;
   background: linear-gradient(
     145deg,
-    rgba(255, 255, 255, 0.07) 0%,
-    rgba(0, 0, 0, 0.32) 100%
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(0, 0, 0, 0.40) 100%
   );
-  backdrop-filter: blur(40px) saturate(1.6);
-  -webkit-backdrop-filter: blur(40px) saturate(1.6);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(40px) saturate(1.1);
+  -webkit-backdrop-filter: blur(40px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   box-shadow:
     0 15px 35px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   border-radius: 18px;
   padding: 14px;
   display: flex;
