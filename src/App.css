@@ -2382,6 +2382,7 @@ body {
   align-items: stretch;
   justify-content: flex-start;
   padding: 0;
+  height: auto !important;
 }
 
 .editor-preview-card.glass-surface {
@@ -2400,4 +2401,5 @@ body {
   align-items: center;
   gap: 10px;
   padding: 14px;
+  height: auto !important;
 }

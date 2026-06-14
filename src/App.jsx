@@ -2241,8 +2241,6 @@ function App() {
       {/* Core Player UI Card wrapper */}
       <div className={`player-wrap ${playerOrientation === 'landscape' ? 'landscape-mode' : 'portrait-mode'}`}>
         <GlassSurface
-          width="100%"
-          height="auto"
           borderRadius={55}
           className="player"
           backgroundOpacity={0}
@@ -2500,8 +2498,6 @@ function App() {
 
                       {/* Floating player card */}
                       <GlassSurface
-                        width="155px"
-                        height="auto"
                         borderRadius={18}
                         className="editor-preview-card"
                         backgroundOpacity={0}

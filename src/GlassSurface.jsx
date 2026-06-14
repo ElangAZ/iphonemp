@@ -4,8 +4,8 @@ import './GlassSurface.css';
 
 const GlassSurface = ({
   children,
-  width = 200,
-  height = 80,
+  width,
+  height,
   borderRadius = 20,
   borderWidth = 0.07,
   brightness = 50,
@@ -145,13 +145,18 @@ const GlassSurface = ({
 
   const containerStyle = {
     ...style,
-    width: typeof width === 'number' ? `${width}px` : width,
-    height: typeof height === 'number' ? `${height}px` : height,
     borderRadius: `${borderRadius}px`,
     '--glass-frost': backgroundOpacity,
     '--glass-saturation': saturation,
     '--filter-id': `url(#${filterId})`
   };
+
+  if (width !== undefined && width !== null) {
+    containerStyle.width = typeof width === 'number' ? `${width}px` : width;
+  }
+  if (height !== undefined && height !== null) {
+    containerStyle.height = typeof height === 'number' ? `${height}px` : height;
+  }
 
   return (
     <div
