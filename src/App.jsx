@@ -21,6 +21,7 @@ function App() {
   const [isEditingDevice, setIsEditingDevice] = useState(false);
   const [showEditorMode, setShowEditorMode] = useState(false);
   const [playerOrientation, setPlayerOrientation] = useState('portrait'); // 'portrait' or 'landscape'
+  const [isCoverVideo, setIsCoverVideo] = useState(false); // Whether cover art is a video file
 
   // Unified render phase state machine
   const [renderPhase, setRenderPhase] = useState('idle'); // 'idle', 'recording', 'converting', 'done', 'error'
@@ -86,6 +87,7 @@ function App() {
   const airplayImgRef = useRef(null);
   const volumeHighImgRef = useRef(null);
   const volumeLowImgRef = useRef(null);
+  const coverVideoRef = useRef(null);
 
   useEffect(() => {
     const airplay = new Image();
@@ -327,12 +329,14 @@ function App() {
     e.target.value = ''; // Reset input to allow selecting same file
   };
 
-  // Custom Cover Image uploader
+  // Custom Cover Image/Video uploader
   const handleCoverUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const url = URL.createObjectURL(file);
+    const isVid = file.type.startsWith('video/');
+    setIsCoverVideo(isVid);
     setArtworkUrl(url);
     setManualCoverSet(true);
     e.target.value = ''; // Reset input to allow selecting same file
@@ -1092,20 +1096,47 @@ function App() {
         console.warn(e);
       }
 
-      // 2. Load cover image
+      // 2. Load cover image or video
       let coverImgObj = null;
-      const domImg = document.querySelector('.artwork-img');
-      if (domImg && domImg.src && domImg.naturalWidth > 0) {
-        coverImgObj = domImg;
-      } else if (artworkUrl) {
+      let coverVidEl = null;
+
+      if (isCoverVideo && coverVideoRef.current && coverVideoRef.current.readyState >= 2) {
+        // Capture a still frame from cover video for blurred background
+        const captureCanvas = document.createElement('canvas');
+        captureCanvas.width = coverVideoRef.current.videoWidth || 640;
+        captureCanvas.height = coverVideoRef.current.videoHeight || 640;
+        const captureCtx = captureCanvas.getContext('2d');
+        captureCtx.drawImage(coverVideoRef.current, 0, 0, captureCanvas.width, captureCanvas.height);
+
         coverImgObj = new Image();
-        coverImgObj.crossOrigin = 'anonymous';
-        await new Promise((resolve) => {
-          coverImgObj.onload = resolve;
-          coverImgObj.onerror = resolve;
-          coverImgObj.src = artworkUrl;
-          if (coverImgObj.complete && coverImgObj.naturalWidth > 0) resolve();
+        coverImgObj.src = captureCanvas.toDataURL('image/jpeg', 0.8);
+        await new Promise(r => { coverImgObj.onload = r; if (coverImgObj.complete) r(); });
+
+        // Create dedicated video element for frame-accurate cover rendering
+        coverVidEl = document.createElement('video');
+        coverVidEl.src = artworkUrl;
+        coverVidEl.muted = true;
+        coverVidEl.playsInline = true;
+        coverVidEl.preload = 'auto';
+        await new Promise(r => {
+          coverVidEl.onloadeddata = r;
+          coverVidEl.onerror = r;
+          coverVidEl.load();
         });
+      } else {
+        const domImg = document.querySelector('.artwork-img');
+        if (domImg && domImg.src && domImg.naturalWidth > 0) {
+          coverImgObj = domImg;
+        } else if (artworkUrl) {
+          coverImgObj = new Image();
+          coverImgObj.crossOrigin = 'anonymous';
+          await new Promise((resolve) => {
+            coverImgObj.onload = resolve;
+            coverImgObj.onerror = resolve;
+            coverImgObj.src = artworkUrl;
+            if (coverImgObj.complete && coverImgObj.naturalWidth > 0) resolve();
+          });
+        }
       }
 
       const durationSeconds = player.duration || 0;
@@ -1281,7 +1312,30 @@ function App() {
         const artY = cardY + artPadding;
         const artRadius = 20;
 
-        if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+        if (coverVidEl && coverVidEl.readyState >= 2 && coverVidEl.duration > 0) {
+          // Seek cover video to looped position for this frame
+          const loopedTime = (currentTime - start) % coverVidEl.duration;
+          coverVidEl.currentTime = loopedTime;
+          await new Promise(r => { coverVidEl.onseeked = r; setTimeout(r, 30); });
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+          ctx.clip();
+          const vw = coverVidEl.videoWidth || artSize;
+          const vh = coverVidEl.videoHeight || artSize;
+          const mRatio = vw / vh;
+          let sx = 0, sy = 0, sw = vw, sh = vh;
+          if (mRatio > 1) {
+            sw = vh;
+            sx = (vw - sw) / 2;
+          } else {
+            sh = vw;
+            sy = (vh - sh) / 2;
+          }
+          ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
+          ctx.restore();
+        } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
           ctx.save();
           ctx.beginPath();
           ctx.roundRect(artX, artY, artSize, artSize, artRadius);
@@ -2105,8 +2159,20 @@ function App() {
       {/* Blurred cover art background on the viewport */}
       <div 
         className="bg-artwork-overlay" 
-        style={{ backgroundImage: artworkUrl ? `url(${artworkUrl})` : 'none' }}
+        style={{ backgroundImage: (!isCoverVideo && artworkUrl) ? `url(${artworkUrl})` : 'none' }}
       />
+      {/* Blurred cover video background (when cover is video) */}
+      {isCoverVideo && artworkUrl && (
+        <video
+          className="bg-artwork-overlay bg-cover-video"
+          src={artworkUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          style={{ objectFit: 'cover', filter: 'blur(40px) saturate(1.7) brightness(0.6)', transform: 'scale(1.3)' }}
+        />
+      )}
 
       {/* Social Media Follow Popup Overlay */}
       {showFollowModal && (
@@ -2226,7 +2292,7 @@ function App() {
         type="file" 
         ref={coverInputRef} 
         id="coverInput" 
-        accept="image/*" 
+        accept="image/*,video/*" 
         onChange={handleCoverUpload} 
       />
 
@@ -2262,7 +2328,8 @@ function App() {
                 <span>Ganti Cover</span>
               </div>
 
-              {isVideo ? (
+              {/* Main song video player (always rendered when isVideo for audio playback) */}
+              {isVideo && (
                 <video 
                   ref={videoRef} 
                   className={`artwork-video ${artworkUrl ? '' : 'visible'}`} 
@@ -2274,16 +2341,30 @@ function App() {
                   onPlay={handlePlay}
                   onPause={handlePause}
                 />
-              ) : (
-                artworkUrl ? (
-                  <img src={artworkUrl} className="artwork-img visible" alt="Cover art" />
+              )}
+
+              {/* Cover art display: video cover (looping), image cover, or placeholder */}
+              {artworkUrl ? (
+                isCoverVideo ? (
+                  <video
+                    ref={coverVideoRef}
+                    src={artworkUrl}
+                    className="artwork-img visible"
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    style={{ objectFit: 'cover' }}
+                  />
                 ) : (
-                  <div className="artwork-placeholder">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="rgba(255,255,255,0.4)" stroke="none" />
-                    </svg>
-                  </div>
+                  <img src={artworkUrl} className="artwork-img visible" alt="Cover art" />
                 )
+              ) : !isVideo && (
+                <div className="artwork-placeholder">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" fill="rgba(255,255,255,0.4)" stroke="none" />
+                  </svg>
+                </div>
               )}
             </div>
           </div>
@@ -2493,8 +2574,16 @@ function App() {
                       {/* Blurred cover art background on the frame */}
                       <div 
                         className="editor-preview-bg" 
-                        style={{ backgroundImage: artworkUrl ? `url(${artworkUrl})` : 'none' }}
+                        style={{ backgroundImage: (!isCoverVideo && artworkUrl) ? `url(${artworkUrl})` : 'none' }}
                       />
+                      {isCoverVideo && artworkUrl && (
+                        <video
+                          className="editor-preview-bg"
+                          src={artworkUrl}
+                          autoPlay loop muted playsInline
+                          style={{ objectFit: 'cover', filter: 'blur(20px) saturate(1.7) brightness(0.5)', transform: 'scale(1.3)', position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
+                        />
+                      )}
 
                       {/* Floating player card */}
                       <GlassSurface
@@ -2509,7 +2598,11 @@ function App() {
                       >
                         <div className="editor-preview-card-art">
                           {artworkUrl ? (
-                            <img src={artworkUrl} alt="Cover" />
+                            isCoverVideo ? (
+                              <video src={artworkUrl} autoPlay loop muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} />
+                            ) : (
+                              <img src={artworkUrl} alt="Cover" />
+                            )
                           ) : (
                             <div className="artwork-placeholder">🎵</div>
                           )}

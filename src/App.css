@@ -37,6 +37,16 @@ body {
   transition: background-image 0.5s ease;
 }
 
+/* Cover video background overlay */
+video.bg-artwork-overlay.bg-cover-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(40px) saturate(1.7) brightness(0.6);
+  transform: scale(1.3);
+  background: none;
+}
+
 /* Upload button - top right */
 .upload-btn {
   position: fixed;
