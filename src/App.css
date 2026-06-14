@@ -2364,3 +2364,40 @@ body {
     padding: 3px 8px !important;
   }
 }
+
+/* GlassSurface overrides for Player and Preview cards */
+.player.glass-surface {
+  width: 90vw;
+  max-width: 390px;
+  height: auto;
+  box-shadow: 0 60px 120px rgba(0,0,0,0.90);
+  border: none;
+  background: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.player.glass-surface .glass-surface__content {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 0;
+}
+
+.editor-preview-card.glass-surface {
+  width: 155px;
+  background: none !important;
+  border: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
+  padding: 0;
+  transition: all 0.3s ease;
+}
+
+.editor-preview-card.glass-surface .glass-surface__content {
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+}

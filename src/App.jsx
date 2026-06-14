@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
+import GlassSurface from './GlassSurface';
 
 function App() {
   const [isPlaying, setIsPlaying] = useState(false);
@@ -535,8 +536,14 @@ function App() {
       ctx.save();
       ctx.beginPath();
       ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
-      ctx.fillStyle = 'rgba(15, 15, 15, 0.45)';
+      // Premium Glassmorphic Canvas Fill
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.fill();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.lineWidth = 2.0;
+      ctx.stroke();
       ctx.restore();
 
       // Card border removed as requested to avoid white line when rendering
@@ -1258,8 +1265,14 @@ function App() {
         ctx.save();
         ctx.beginPath();
         ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
-        ctx.fillStyle = 'rgba(15, 15, 15, 0.45)';
+        // Premium Glassmorphic Canvas Fill
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
         ctx.fill();
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
         ctx.restore();
 
         const artPadding = 35;
@@ -2227,7 +2240,18 @@ function App() {
 
       {/* Core Player UI Card wrapper */}
       <div className={`player-wrap ${playerOrientation === 'landscape' ? 'landscape-mode' : 'portrait-mode'}`}>
-        <div className="player">
+        <GlassSurface
+          width="100%"
+          height="auto"
+          borderRadius={55}
+          className="player"
+          backgroundOpacity={0}
+          saturation={1.8}
+          distortionScale={-180}
+          brightness={50}
+          opacity={0.93}
+          blur={11}
+        >
           {/* Card Artwork area */}
           <div className="artwork-section">
             <div className="artwork-container">
@@ -2427,7 +2451,7 @@ function App() {
               )}
             </div>
           </div>
-        </div>
+        </GlassSurface>
       </div>
 
       {/* DOM placeholders to prevent background visualizer scripts (if any) from throwing TypeErrors */}
@@ -2475,7 +2499,18 @@ function App() {
                       />
 
                       {/* Floating player card */}
-                      <div className="editor-preview-card">
+                      <GlassSurface
+                        width="155px"
+                        height="auto"
+                        borderRadius={18}
+                        className="editor-preview-card"
+                        backgroundOpacity={0}
+                        saturation={1.8}
+                        distortionScale={-180}
+                        brightness={50}
+                        opacity={0.93}
+                        blur={11}
+                      >
                         <div className="editor-preview-card-art">
                           {artworkUrl ? (
                             <img src={artworkUrl} alt="Cover" />
@@ -2532,7 +2567,7 @@ function App() {
                             <span>{deviceName}</span>
                           </div>
                         </div>
-                      </div>
+                      </GlassSurface>
                     </div>
                   </div>
                 </div>
