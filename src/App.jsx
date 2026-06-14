@@ -18,6 +18,8 @@ function App() {
   const [showFollowModal, setShowFollowModal] = useState(true);
   const [deviceName, setDeviceName] = useState('senux');
   const [isEditingDevice, setIsEditingDevice] = useState(false);
+  const [showEditorMode, setShowEditorMode] = useState(false);
+  const [playerOrientation, setPlayerOrientation] = useState('portrait'); // 'portrait' or 'landscape'
 
   // Unified render phase state machine
   const [renderPhase, setRenderPhase] = useState('idle'); // 'idle', 'recording', 'converting', 'done', 'error'
@@ -35,12 +37,35 @@ function App() {
   const [renderEnd, setRenderEnd] = useState('0:30');
   const [renderResolution, setRenderResolution] = useState('720'); // '720' or '1080'
   const [renderFps, setRenderFps] = useState('30'); // '30' or '60'
+  const [renderAspectRatio, setRenderAspectRatio] = useState('16:9'); // '16:9' or '9:16' or '1:1'
+  const [renderCodec, setRenderCodec] = useState('h264'); // 'h264'
   const [renderBitrate, setRenderBitrate] = useState('3500'); // kbps: '2000', '3500', '6000'
   const [renderAudioQuality, setRenderAudioQuality] = useState('256'); // kbps: '128', '256', '320'
   const [isAudioFadeEnabled, setIsAudioFadeEnabled] = useState(true); // Toggle audio fading
   const [audioFadeDuration, setAudioFadeDuration] = useState('1'); // Audio fade duration in seconds
   const [usedNativeMp4, setUsedNativeMp4] = useState(false); // Track if native MP4 was used
   const [nativeRenderUri, setNativeRenderUri] = useState('');
+
+  // Initialize with a beautiful default audio waveform pattern (Intro, Verse, Build, Drop, Outro)
+  const [waveformPeaks, setWaveformPeaks] = useState(() => {
+    const defaultPeaks = [];
+    for (let i = 0; i < 150; i++) {
+      let base = 0.1;
+      if (i < 28) {
+        base = 0.15 + (i / 28) * 0.35;
+      } else if (i < 65) {
+        base = 0.4 + Math.sin(i * 0.3) * 0.15;
+      } else if (i < 85) {
+        base = 0.45 + ((i - 65) / 20) * 0.4 + Math.sin(i * 0.6) * 0.1;
+      } else if (i < 120) {
+        base = 0.8 + Math.sin(i * 0.9) * 0.18;
+      } else {
+        base = 0.55 * (1 - (i - 120) / 30) + Math.sin(i * 0.3) * 0.1;
+      }
+      defaultPeaks.push(Math.max(0.08, Math.min(1.0, base + Math.random() * 0.08)));
+    }
+    return defaultPeaks;
+  });
 
   const audioRef = useRef(null);
   const songFileRef = useRef(null);
@@ -49,6 +74,7 @@ function App() {
   const coverInputRef = useRef(null);
   const canvasRef = useRef(null);
   const uiCanvasRef = useRef(null);
+  const editorVisualizerRef = useRef(null);
   const analyserRef = useRef(null);
   const animationFrameRef = useRef(null);
   const mediaRecorderRef = useRef(null);
@@ -212,12 +238,60 @@ function App() {
     }
   };
 
+  const generateWaveform = async (file) => {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      const tempCtx = new AudioContextClass();
+      const arrayBuffer = await file.arrayBuffer();
+      const audioBuffer = await tempCtx.decodeAudioData(arrayBuffer);
+      const channelData = audioBuffer.getChannelData(0);
+      const step = Math.ceil(channelData.length / 150);
+      const peaks = [];
+      
+      for (let i = 0; i < 150; i++) {
+        let sum = 0;
+        const start = i * step;
+        const end = Math.min(start + step, channelData.length);
+        const count = end - start;
+        for (let j = start; j < end; j++) {
+          sum += Math.abs(channelData[j]);
+        }
+        const avg = count > 0 ? (sum / count) : 0;
+        peaks.push(avg);
+      }
+      
+      const maxPeak = Math.max(...peaks) || 1;
+      const normalizedPeaks = peaks.map(p => {
+        const ratio = p / maxPeak;
+        // Exaggerate dynamic range differences: quiet sections drop low, beats stand out
+        return Math.max(0.06, Math.pow(ratio, 1.5));
+      });
+      setWaveformPeaks(normalizedPeaks);
+      tempCtx.close();
+    } catch (err) {
+      console.error("Failed to generate waveform:", err);
+      // Fallback pseudo-random waveform profile with distinct quiet and loud parts
+      const fakePeaks = [];
+      for (let i = 0; i < 150; i++) {
+        let base = 0.1;
+        if (i < 28) base = 0.1 + (i / 28) * 0.2;
+        else if (i < 65) base = 0.3 + Math.sin(i * 0.3) * 0.1;
+        else if (i < 85) base = 0.3 + ((i - 65) / 20) * 0.5;
+        else if (i < 120) base = 0.8 + Math.sin(i * 0.9) * 0.15;
+        else base = 0.5 * (1 - (i - 120) / 30);
+        fakePeaks.push(Math.max(0.06, Math.pow(base, 1.5) + Math.random() * 0.05));
+      }
+      setWaveformPeaks(fakePeaks);
+    }
+  };
+
   // Audio/Video file upload handler
   const handleSongUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     songFileRef.current = file;
+    generateWaveform(file);
     const url = URL.createObjectURL(file);
     const fileIsVideo = file.type.startsWith('video/');
 
@@ -774,32 +848,28 @@ function App() {
       const volX = cardX + artPadding + 48; // Shift slider to give space for larger speakers
       const volWidth = cardWidth - (artPadding * 2) - 96;
       
-      // Left low-volume speaker icon (Scaled up by 1.8x)
+      // Left low-volume speaker icon
+      ctx.save();
+      ctx.globalAlpha = 0.8;
       if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-        ctx.save();
-        ctx.translate(volX - 38, volY - 4.8);
-        ctx.scale(1.8, 1.8);
-        ctx.globalAlpha = 0.45;
-        const img = volumeLowImgRef.current;
-        const ratio = img.naturalWidth / img.naturalHeight;
-        ctx.drawImage(img, 0, 0, 11.0 * ratio, 11.0);
-        ctx.restore();
+        ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 32, volY - 6, 20.3, 22);
       } else {
         ctx.save();
-        ctx.translate(volX - 42, volY - 16.6);
+        ctx.translate(volX - 38, volY - 11);
         ctx.scale(1.8, 1.8);
         ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
         ctx.beginPath();
-        ctx.moveTo(9, 6);
-        ctx.lineTo(5, 9);
-        ctx.lineTo(2, 9);
-        ctx.lineTo(2, 15);
-        ctx.lineTo(5, 15);
-        ctx.lineTo(9, 18);
+        ctx.moveTo(3, 7);
+        ctx.lineTo(6, 7);
+        ctx.lineTo(10, 3);
+        ctx.lineTo(10, 15);
+        ctx.lineTo(6, 11);
+        ctx.lineTo(3, 11);
         ctx.closePath();
         ctx.fill();
         ctx.restore();
       }
+      ctx.restore();
 
       // Volume track bg
       ctx.beginPath();
@@ -813,17 +883,41 @@ function App() {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
       ctx.fill();
 
-      // Right high-volume speaker icon (Scaled up by 1.8x)
+      // Right high-volume speaker icon
+      ctx.save();
+      ctx.globalAlpha = 0.45;
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
+      } else {
         ctx.save();
-        ctx.translate(volX + volWidth + 14, volY - 8.0);
+        ctx.translate(volX + volWidth + 14, volY - 11);
         ctx.scale(1.8, 1.8);
-        ctx.globalAlpha = 0.45;
-        const img = volumeHighImgRef.current;
-        const ratio = img.naturalWidth / img.naturalHeight;
-        ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(3, 7);
+        ctx.lineTo(6, 7);
+        ctx.lineTo(10, 3);
+        ctx.lineTo(10, 15);
+        ctx.lineTo(6, 11);
+        ctx.lineTo(3, 11);
+        ctx.closePath();
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(10, 9, 2.5, -Math.PI / 3, Math.PI / 3, false);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(10, 9, 5.0, -Math.PI / 3, Math.PI / 3, false);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(10, 9, 7.5, -Math.PI / 3, Math.PI / 3, false);
+        ctx.stroke();
         ctx.restore();
       }
+      ctx.restore();
       
       // 8. Device selector pill button at the bottom center (Dynamic centering & width based on custom name)
       ctx.font = '600 22px Inter';
@@ -1017,14 +1111,24 @@ function App() {
         return;
       }
 
-      // Set up Canvas resolution
+      // Set up Canvas resolution based on Aspect Ratio and Resolution
       const canvas = canvasRef.current;
+      let baseRes = 720;
       if (renderResolution === '1080') {
-        canvas.width = 1080;
-        canvas.height = 1920;
-      } else {
-        canvas.width = 720;
-        canvas.height = 1280;
+        baseRes = 1080;
+      } else if (renderResolution === '1440') {
+        baseRes = 1440;
+      }
+
+      if (renderAspectRatio === '16:9') {
+        canvas.width = Math.round(baseRes * (16 / 9));
+        canvas.height = baseRes;
+      } else if (renderAspectRatio === '1:1') {
+        canvas.width = baseRes;
+        canvas.height = baseRes;
+      } else { // 9:16 Portrait
+        canvas.width = baseRes;
+        canvas.height = Math.round(baseRes * (16 / 9));
       }
       const ctx = canvas.getContext('2d');
 
@@ -1136,9 +1240,12 @@ function App() {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        const scaleFactor = canvas.width / 720;
+        // Calculate scale and offset to fit the 720x1280 virtual card layout inside the actual canvas size
+        const scale = canvas.height / 1280;
+        const offsetX = (canvas.width - 720 * scale) / 2;
         ctx.save();
-        ctx.scale(scaleFactor, scaleFactor);
+        ctx.translate(offsetX, 0);
+        ctx.scale(scale, scale);
 
         const cardWidth = 560;
         const cardHeight = 960;
@@ -1352,31 +1459,28 @@ function App() {
         const volX = cardX + artPadding + 48;
         const volWidth = cardWidth - (artPadding * 2) - 96;
 
+        // Left low-volume speaker icon
+        ctx.save();
+        ctx.globalAlpha = 0.8;
         if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-          ctx.save();
-          ctx.translate(volX - 38, volY - 4.8);
-          ctx.scale(1.8, 1.8);
-          ctx.globalAlpha = 0.45;
-          const img = volumeLowImgRef.current;
-          const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, 0, 0, 11.0 * ratio, 11.0);
-          ctx.restore();
+          ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 32, volY - 6, 20.3, 22);
         } else {
           ctx.save();
-          ctx.translate(volX - 42, volY - 16.6);
+          ctx.translate(volX - 38, volY - 11);
           ctx.scale(1.8, 1.8);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
           ctx.beginPath();
-          ctx.moveTo(9, 6);
-          ctx.lineTo(5, 9);
-          ctx.lineTo(2, 9);
-          ctx.lineTo(2, 15);
-          ctx.lineTo(5, 15);
-          ctx.lineTo(9, 18);
+          ctx.moveTo(3, 7);
+          ctx.lineTo(6, 7);
+          ctx.lineTo(10, 3);
+          ctx.lineTo(10, 15);
+          ctx.lineTo(6, 11);
+          ctx.lineTo(3, 11);
           ctx.closePath();
           ctx.fill();
           ctx.restore();
         }
+        ctx.restore();
 
         ctx.beginPath();
         ctx.roundRect(volX, volY, volWidth, 10, 5);
@@ -1388,17 +1492,41 @@ function App() {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
         ctx.fill();
 
-        // Right high-volume speaker icon (Scaled up by 1.8x)
+        // Right high-volume speaker icon
+        ctx.save();
+        ctx.globalAlpha = 0.45;
         if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+          ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
+        } else {
           ctx.save();
-          ctx.translate(volX + volWidth + 14, volY - 8.0);
+          ctx.translate(volX + volWidth + 14, volY - 11);
           ctx.scale(1.8, 1.8);
-          ctx.globalAlpha = 0.45;
-          const img = volumeHighImgRef.current;
-          const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, 0, 0, 14.5 * ratio, 14.5);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 1.8;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(3, 7);
+          ctx.lineTo(6, 7);
+          ctx.lineTo(10, 3);
+          ctx.lineTo(10, 15);
+          ctx.lineTo(6, 11);
+          ctx.lineTo(3, 11);
+          ctx.closePath();
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(10, 9, 2.5, -Math.PI / 3, Math.PI / 3, false);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(10, 9, 5.0, -Math.PI / 3, Math.PI / 3, false);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(10, 9, 7.5, -Math.PI / 3, Math.PI / 3, false);
+          ctx.stroke();
           ctx.restore();
         }
+        ctx.restore();
 
         // Device Selector Pill
         ctx.font = '600 22px Inter';
@@ -1765,6 +1893,17 @@ function App() {
   const handleTimeUpdate = () => {
     const player = getActivePlayer();
     if (player) {
+      // Clamp playback position inside editor mode
+      if (showEditorMode) {
+        const startSecs = parseTimeToSeconds(renderStartRef.current);
+        const limitSecs = parseTimeToSeconds(renderEndRef.current);
+        if (player.currentTime < startSecs) {
+          player.currentTime = startSecs;
+        } else if (player.currentTime > limitSecs) {
+          player.currentTime = startSecs; // Loop back to start range
+        }
+      }
+
       setCurrentTime(player.currentTime);
       // Automatically stop rendering once custom end time limit is met
       if (isRecordingRef.current) {
@@ -1810,31 +1949,8 @@ function App() {
   // Live UI Visualizer Loop
   useEffect(() => {
     let animationFrameId;
-    const canvas = uiCanvasRef.current;
-    if (!canvas) return;
-
-    const resizeCanvas = () => {
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * (window.devicePixelRatio || 1);
-      canvas.height = rect.height * (window.devicePixelRatio || 1);
-    };
-    resizeCanvas();
-    
-    const observer = new ResizeObserver(() => resizeCanvas());
-    observer.observe(canvas);
-
-    const ctx = canvas.getContext('2d');
-    const barCount = 6;
-    const gap = 2;
-    const smoothHeights = new Array(barCount).fill(0);
 
     const draw = () => {
-      if (!ctx || !canvas) return;
-      const width = canvas.width;
-      const height = canvas.height;
-      const centerY = height / 2;
-      ctx.clearRect(0, 0, width, height);
-
       let dataArray = new Uint8Array(0);
       if (analyserRef.current && isPlaying) {
         const bufferLength = analyserRef.current.frequencyBinCount;
@@ -1842,52 +1958,81 @@ function App() {
         analyserRef.current.getByteFrequencyData(dataArray);
       }
 
+      const barCount = 6;
+      const gap = 2;
       const barWidth = 2;
       const totalWidth = barCount * barWidth + (barCount - 1) * gap;
-      const offsetX = (width - totalWidth) / 2;
-      
-      for (let i = 0; i < barCount; i++) {
-        let val = 0;
-        if (dataArray.length > 0) {
-          if (i === 0) {
-            // Leftmost bar: kick/bass only (bins 0-1, sub-bass ~0-172Hz with high fftSize)
-            let bassSum = 0;
-            for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
-            const bassAvg = bassSum / 2;
-            // Low threshold (145) to trigger easily, low multiplier (1.6) so it never hits max height
-            val = bassAvg > 145 ? (bassAvg - 145) * 1.6 : 0;
-          } else {
-            // Bars 2-6: mapped to specific active frequency bands
-            const freqBins = [20, 36, 56, 80, 110];
-            const dataIdx = freqBins[i - 1] || 20;
-            val = dataArray[dataIdx] || 0;
-          }
-        }
 
-        const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
-        const targetHeight = normalized * height;
+      const canvases = [
+        { el: uiCanvasRef.current, smooths: uiCanvasRef.current?.__smooths || new Array(barCount).fill(0) },
+        { el: editorVisualizerRef.current, smooths: editorVisualizerRef.current?.__smooths || new Array(barCount).fill(0) }
+      ];
+
+      // Store smooth heights array on the DOM elements to persist across frames
+      if (uiCanvasRef.current && !uiCanvasRef.current.__smooths) uiCanvasRef.current.__smooths = canvases[0].smooths;
+      if (editorVisualizerRef.current && !editorVisualizerRef.current.__smooths) editorVisualizerRef.current.__smooths = canvases[1].smooths;
+
+      canvases.forEach(({ el, smooths }) => {
+        if (!el) return;
         
-        // Apply fast rise and decay (instant rise, extremely fast decay)
-        const decayRate = 0.75;
-        if (targetHeight > smoothHeights[i]) {
-          smoothHeights[i] += (targetHeight - smoothHeights[i]) * 1.0; // Kecepatan naik
-        } else {
-          smoothHeights[i] -= (smoothHeights[i] - targetHeight) * decayRate; // Kecepatan turun
+        // Auto resize canvas to bounding box
+        const rect = el.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const targetW = Math.round(rect.width * dpr);
+        const targetH = Math.round(rect.height * dpr);
+        if (el.width !== targetW || el.height !== targetH) {
+          el.width = targetW;
+          el.height = targetH;
         }
 
-        const halfH = Math.max(1, smoothHeights[i] / 2);
-        const x = offsetX + i * (barWidth + gap);
+        const ctx = el.getContext('2d');
+        if (!ctx) return;
+        const width = el.width;
+        const height = el.height;
+        const centerY = height / 2;
+        ctx.clearRect(0, 0, width, height);
 
-        ctx.beginPath();
-        ctx.roundRect(x, centerY - halfH, barWidth, halfH, 0.8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fill();
+        const offsetX = (width - totalWidth) / 2;
+        
+        for (let i = 0; i < barCount; i++) {
+          let val = 0;
+          if (dataArray.length > 0) {
+            if (i === 0) {
+              let bassSum = 0;
+              for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
+              const bassAvg = bassSum / 2;
+              val = bassAvg > 145 ? (bassAvg - 145) * 1.6 : 0;
+            } else {
+              const freqBins = [20, 36, 56, 80, 110];
+              const dataIdx = freqBins[i - 1] || 20;
+              val = dataArray[dataIdx] || 0;
+            }
+          }
 
-        ctx.beginPath();
-        ctx.roundRect(x, centerY, barWidth, halfH, 0.8);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.fill();
-      }
+          const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+          const targetHeight = normalized * height;
+          
+          const decayRate = 0.75;
+          if (targetHeight > smooths[i]) {
+            smooths[i] += (targetHeight - smooths[i]) * 1.0;
+          } else {
+            smooths[i] -= (smooths[i] - targetHeight) * decayRate;
+          }
+
+          const halfH = Math.max(1, smooths[i] / 2);
+          const x = offsetX + i * (barWidth + gap);
+
+          ctx.beginPath();
+          ctx.roundRect(x, centerY - halfH, barWidth, halfH, 0.8);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.roundRect(x, centerY, barWidth, halfH, 0.8);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.fill();
+        }
+      });
 
       animationFrameId = requestAnimationFrame(draw);
     };
@@ -1896,7 +2041,6 @@ function App() {
 
     return () => {
       cancelAnimationFrame(animationFrameId);
-      observer.disconnect();
     };
   }, [isPlaying]);
 
@@ -1938,9 +2082,52 @@ function App() {
           </div>
         </div>
       )}
-
-      {/* Control Buttons on top right with snippet settings */}
+      {/* Control Buttons on top right */}
       <div className="top-controls-container">
+        {/* Orientation Toggle Group */}
+        <div className="orientation-toggle-group" style={{ display: 'flex', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '14px', padding: '3px', border: '1px solid rgba(255,255,255,0.06)', marginRight: '8px' }}>
+          <button 
+            className={`toggle-mode-btn ${playerOrientation === 'portrait' ? 'active' : ''}`}
+            onClick={() => setPlayerOrientation('portrait')}
+            style={{
+              background: playerOrientation === 'portrait' ? 'rgba(255, 255, 255, 0.12)' : 'none',
+              border: 'none',
+              color: playerOrientation === 'portrait' ? '#fff' : 'rgba(255,255,255,0.5)',
+              padding: '6px 14px',
+              borderRadius: '11px',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <i className="fa-solid fa-mobile-screen-button"></i> Portrait
+          </button>
+          <button 
+            className={`toggle-mode-btn ${playerOrientation === 'landscape' ? 'active' : ''}`}
+            onClick={() => setPlayerOrientation('landscape')}
+            style={{
+              background: playerOrientation === 'landscape' ? 'rgba(255, 255, 255, 0.12)' : 'none',
+              border: 'none',
+              color: playerOrientation === 'landscape' ? '#fff' : 'rgba(255,255,255,0.5)',
+              padding: '6px 14px',
+              borderRadius: '11px',
+              fontSize: '12px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <i className="fa-solid fa-laptop"></i> Landscape
+          </button>
+        </div>
+
         <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M12 5v14M5 12h14" />
@@ -1950,7 +2137,18 @@ function App() {
 
         <button 
           className={`upload-btn record-btn ${isRecording ? 'active' : ''}`}
-          onClick={toggleVideoRecord}
+          onClick={() => {
+            if (isRecording) {
+              toggleVideoRecord();
+              return;
+            }
+            const player = getActivePlayer();
+            if (!player || !player.src || !songFileRef.current) {
+              alert("Please upload/load a song file (.mp3 / .wav) before exporting.");
+              return;
+            }
+            setShowEditorMode(true);
+          }}
         >
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="10" />
@@ -1958,85 +2156,6 @@ function App() {
           </svg>
           {isRecording ? 'Stop Render' : 'Render Video'}
         </button>
-
-        {/* Snippet Render Settings Panel */}
-        {!isRecording && (
-          <div className="snippet-settings-panel">
-            {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
-              <div className="mobile-render-warning">
-                ⚠️ Render di HP rentan crash (OOM). Sangat disarankan set 720p & 30 FPS.
-              </div>
-            )}
-            <div className="settings-row">
-              <label>Mulai:</label>
-              <input 
-                type="text" 
-                value={renderStart} 
-                onChange={(e) => setRenderStart(e.target.value)} 
-                placeholder="0:00"
-                className="snippet-input"
-              />
-            </div>
-            <div className="settings-row">
-              <label>Sampai:</label>
-              <input 
-                type="text" 
-                value={renderEnd} 
-                onChange={(e) => setRenderEnd(e.target.value)} 
-                placeholder="0:30"
-                className="snippet-input"
-              />
-            </div>
-            <div className="settings-row">
-              <label>Resolusi:</label>
-              <select 
-                value={renderResolution} 
-                onChange={(e) => setRenderResolution(e.target.value)}
-                className="snippet-select"
-              >
-                <option value="720">720p (HD)</option>
-                <option value="1080">1080p (FHD)</option>
-              </select>
-            </div>
-            <div className="settings-row">
-              <label>FPS:</label>
-              <select 
-                value={renderFps} 
-                onChange={(e) => setRenderFps(e.target.value)}
-                className="snippet-select"
-              >
-                <option value="30">30 FPS</option>
-                <option value="60">60 FPS</option>
-              </select>
-            </div>
-            <div className="settings-row-separator" />
-            <div className="settings-row checkbox-row">
-              <label htmlFor="audioFadeToggle">Fade In/Out:</label>
-              <input 
-                id="audioFadeToggle"
-                type="checkbox" 
-                checked={isAudioFadeEnabled} 
-                onChange={(e) => setIsAudioFadeEnabled(e.target.checked)}
-                className="snippet-checkbox"
-              />
-            </div>
-            {isAudioFadeEnabled && (
-              <div className="settings-row">
-                <label>Durasi Fade (s):</label>
-                <input 
-                  type="number" 
-                  min="0.5"
-                  max="15"
-                  step="0.5"
-                  value={audioFadeDuration} 
-                  onChange={(e) => setAudioFadeDuration(e.target.value)} 
-                  placeholder="1"
-                  className="snippet-input duration-input"
-                />
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Hidden inputs */}
@@ -2064,7 +2183,7 @@ function App() {
       />
 
       {/* Core Player UI Card wrapper */}
-      <div className="player-wrap">
+      <div className={`player-wrap ${playerOrientation === 'landscape' ? 'landscape-mode' : 'portrait-mode'}`}>
         <div className="player">
           {/* Card Artwork area */}
           <div className="artwork-section">
@@ -2104,170 +2223,575 @@ function App() {
             </div>
           </div>
 
-          {/* Song Info */}
-          <div className="song-info">
-            <div className="text-wrapper" id="songTextContainer">
-              {isEditingText ? (
-                <div className="edit-metadata-container" onBlur={handleContainerBlur}>
-                  <input 
-                    type="text" 
-                    value={songTitle} 
-                    onChange={(e) => setSongTitle(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
-                    autoFocus
-                    className="inline-edit-input title-input"
-                  />
-                  <input 
-                    type="text" 
-                    value={songArtist} 
-                    onChange={(e) => setSongArtist(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
-                    className="inline-edit-input artist-input"
-                  />
-                </div>
-              ) : (
-                <div onClick={() => setIsEditingText(true)} style={{ cursor: 'pointer', width: '100%', overflow: 'hidden' }} title="Klik untuk edit nama & artis">
-                  <div className={`title-container ${isMarquee ? 'has-marquee' : ''}`} ref={containerRef}>
-                    <span 
-                      className={`song-name ${isMarquee ? 'marquee' : ''}`} 
-                      ref={titleRef}
-                    >
-                      {songTitle}
-                    </span>
-                    {isMarquee && (
-                      <span className="song-name marquee duplicate">
+          <div className="player-details">
+            {/* Song Info */}
+            <div className="song-info">
+              <div className="text-wrapper" id="songTextContainer">
+                {isEditingText ? (
+                  <div className="edit-metadata-container" onBlur={handleContainerBlur}>
+                    <input 
+                      type="text" 
+                      value={songTitle} 
+                      onChange={(e) => setSongTitle(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
+                      autoFocus
+                      className="inline-edit-input title-input"
+                    />
+                    <input 
+                      type="text" 
+                      value={songArtist} 
+                      onChange={(e) => setSongArtist(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingText(false); }}
+                      className="inline-edit-input artist-input"
+                    />
+                  </div>
+                ) : (
+                  <div onClick={() => setIsEditingText(true)} style={{ cursor: 'pointer', width: '100%', overflow: 'hidden' }} title="Klik untuk edit nama & artis">
+                    <div className={`title-container ${isMarquee ? 'has-marquee' : ''}`} ref={containerRef}>
+                      <span 
+                        className={`song-name ${isMarquee ? 'marquee' : ''}`} 
+                        ref={titleRef}
+                      >
                         {songTitle}
                       </span>
-                    )}
+                      {isMarquee && (
+                        <span className="song-name marquee duplicate">
+                          {songTitle}
+                        </span>
+                      )}
+                    </div>
+                    <div className="song-artist">{songArtist}</div>
                   </div>
-                  <div className="song-artist">{songArtist}</div>
-                </div>
+                )}
+              </div>
+              {/* Live visualizer spectrum bars - right side aligned with title/artist */}
+              <canvas ref={uiCanvasRef} className="ui-visualizer" />
+            </div>
+
+            {/* Progress Seekbar */}
+            <div className="progress-section">
+              <div className="progress-track" onClick={handleSeek}>
+                <div 
+                  className="progress-fill" 
+                  style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                />
+              </div>
+              <div className="time-labels">
+                <span>{formatTime(currentTime)}</span>
+                <span>-{formatTime(duration > 0 ? (duration - currentTime) : 0)}</span>
+              </div>
+            </div>
+
+            {/* Player controls */}
+            <div className="controls" style={{ position: 'relative' }}>
+              {/* Star Outline - Positioned on the left */}
+              <button className="ctrl-btn small star-btn" style={{ position: 'absolute', left: '28px', opacity: 0.55 }}>
+                <svg 
+                  viewBox="0 0 24 24" 
+                  width="34" 
+                  height="34" 
+                  fill="none" 
+                  stroke="white" 
+                  strokeWidth="2.2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+              </button>
+
+              {/* Middle Playback buttons - centered without star */}
+              <div className="control-center">
+                <button className="ctrl-btn small">
+                  <svg 
+                    viewBox="0 0 24 24" 
+                    width="40" 
+                    height="40" 
+                    fill="white" 
+                    stroke="white" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M10 6 L2 12 L10 18 Z M20 6 L12 12 L20 18 Z" />
+                  </svg>
+                </button>
+
+                {/* Prefer actual media element state when available to avoid visual desync */}
+                <button className="ctrl-btn play-btn" onClick={togglePlay} aria-label={getActualPlaying() ? 'Pause' : 'Play'}>
+                  <i className={`fa-solid ${getActualPlaying() ? 'fa-pause' : 'fa-play'}`} aria-hidden="true"></i>
+                </button>
+
+                <button className="ctrl-btn small">
+                  <svg 
+                    viewBox="0 0 24 24" 
+                    width="40" 
+                    height="40" 
+                    fill="white" 
+                    stroke="white" 
+                    strokeWidth="2" 
+                    strokeLinecap="round" 
+                    strokeLinejoin="round"
+                  >
+                    <path d="M4 6 L12 12 L4 18 Z M14 6 L22 12 L14 18 Z" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Volume seek section with sleek speaker SVGs */}
+            <div className="volume-section">
+              <img className="volume-icon volume-icon-low" src="/volume-low.png" alt="Volume Low" style={{ opacity: 0.8 }} />
+              <div className="volume-track" onClick={handleVolumeChange}>
+                <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
+              </div>
+              <img className="volume-icon" src="/volume-high.png" alt="Volume High" style={{ opacity: 0.45 }} />
+            </div>
+
+            {/* Bottom Device Selector Pill */}
+            <div className="device-selector-container">
+              {isEditingDevice ? (
+                <input 
+                  type="text" 
+                  value={deviceName} 
+                  onChange={(e) => setDeviceName(e.target.value)}
+                  onBlur={() => setIsEditingDevice(false)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingDevice(false); }}
+                  autoFocus
+                  className="device-pill-input"
+                  style={{
+                    background: 'rgba(255, 255, 255, 0.12)',
+                    border: 'none',
+                    borderRadius: '30px',
+                    padding: '8px 18px',
+                    color: '#ffffff',
+                    fontSize: '13.5px',
+                    fontWeight: '600',
+                    textAlign: 'center',
+                    outline: 'none',
+                    width: '130px'
+                  }}
+                />
+              ) : (
+                <button 
+                  className="device-pill" 
+                  onClick={() => setIsEditingDevice(true)} 
+                  title="Klik untuk ganti nama device"
+                >
+                  <img src="/airplay.png" alt="AirPlay" style={{ width: '15px', height: '15px' }} />
+                  <span>{deviceName}</span>
+                </button>
               )}
             </div>
-            {/* Live visualizer spectrum bars - right side aligned with title/artist */}
-            <canvas ref={uiCanvasRef} className="ui-visualizer" />
-          </div>
-
-          {/* Progress Seekbar */}
-          <div className="progress-section">
-            <div className="progress-track" onClick={handleSeek}>
-              <div 
-                className="progress-fill" 
-                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-              />
-            </div>
-            <div className="time-labels">
-              <span>{formatTime(currentTime)}</span>
-              <span>-{formatTime(duration > 0 ? (duration - currentTime) : 0)}</span>
-            </div>
-          </div>
-
-          {/* Player controls */}
-          <div className="controls" style={{ position: 'relative' }}>
-            {/* Star Outline - Positioned on the left */}
-            <button className="ctrl-btn small star-btn" style={{ position: 'absolute', left: '28px', opacity: 0.55 }}>
-              <svg 
-                viewBox="0 0 24 24" 
-                width="34" 
-                height="34" 
-                fill="none" 
-                stroke="white" 
-                strokeWidth="2.2" 
-                strokeLinecap="round" 
-                strokeLinejoin="round"
-              >
-                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
-              </svg>
-            </button>
-
-            {/* Middle Playback buttons - centered without star */}
-            <div className="control-center">
-              <button className="ctrl-btn small">
-                <svg 
-                  viewBox="0 0 24 24" 
-                  width="40" 
-                  height="40" 
-                  fill="white" 
-                  stroke="white" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <path d="M10 6 L2 12 L10 18 Z M20 6 L12 12 L20 18 Z" />
-                </svg>
-              </button>
-
-              {/* Prefer actual media element state when available to avoid visual desync */}
-              <button className="ctrl-btn play-btn" onClick={togglePlay} aria-label={getActualPlaying() ? 'Pause' : 'Play'}>
-                <i className={`fa-solid ${getActualPlaying() ? 'fa-pause' : 'fa-play'}`} aria-hidden="true"></i>
-              </button>
-
-              <button className="ctrl-btn small">
-                <svg 
-                  viewBox="0 0 24 24" 
-                  width="40" 
-                  height="40" 
-                  fill="white" 
-                  stroke="white" 
-                  strokeWidth="2" 
-                  strokeLinecap="round" 
-                  strokeLinejoin="round"
-                >
-                  <path d="M4 6 L12 12 L4 18 Z M14 6 L22 12 L14 18 Z" />
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          {/* Volume seek section with sleek speaker SVGs */}
-          <div className="volume-section">
-            <img className="volume-icon volume-icon-low" src="/volume-low.png" alt="Volume Low" style={{ opacity: 0.45 }} />
-            <div className="volume-track" onClick={handleVolumeChange}>
-              <div className="volume-fill" style={{ width: `${volume * 100}%` }} />
-            </div>
-            <img className="volume-icon" src="/volume-high.png" alt="Volume High" style={{ opacity: 0.45 }} />
-          </div>
-
-          {/* Bottom Device Selector Pill */}
-          <div className="device-selector-container">
-            {isEditingDevice ? (
-              <input 
-                type="text" 
-                value={deviceName} 
-                onChange={(e) => setDeviceName(e.target.value)}
-                onBlur={() => setIsEditingDevice(false)}
-                onKeyDown={(e) => { if (e.key === 'Enter') setIsEditingDevice(false); }}
-                autoFocus
-                className="device-pill-input"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.12)',
-                  border: 'none',
-                  borderRadius: '30px',
-                  padding: '8px 18px',
-                  color: '#ffffff',
-                  fontSize: '13.5px',
-                  fontWeight: '600',
-                  textAlign: 'center',
-                  outline: 'none',
-                  width: '130px'
-                }}
-              />
-            ) : (
-              <button 
-                className="device-pill" 
-                onClick={() => setIsEditingDevice(true)} 
-                title="Klik untuk ganti nama device"
-              >
-                <img src="/airplay.png" alt="AirPlay" style={{ width: '15px', height: '15px' }} />
-                <span>{deviceName}</span>
-              </button>
-            )}
           </div>
         </div>
       </div>
 
       {/* DOM placeholders to prevent background visualizer scripts (if any) from throwing TypeErrors */}
       <div className="visualizer" style={{ display: 'none' }} />
+
+      {/* ===== Editor Mode (CapCut-style) ===== */}
+      {showEditorMode && (
+        <div className="editor-overlay">
+          <div className="editor-container">
+            {/* Header */}
+            <div className="editor-header">
+              <div className="editor-header-left">
+                <h2 className="editor-title">Export</h2>
+                <span className="editor-status-badge">● Encoder Ready</span>
+              </div>
+              <button className="editor-close-btn" onClick={() => setShowEditorMode(false)} title="Tutup">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Workspace wrapper for layout */}
+            <div className="editor-workspace">
+              
+              {/* Top Section: Preview (left) & Settings (right) */}
+              <div className="editor-top-section">
+                {/* Left Column: Preview */}
+                <div className="editor-left-column">
+                  {/* Preview Area */}
+                  <div className="editor-preview-area">
+                    <div 
+                      className={`editor-preview-frame ${renderAspectRatio === '16:9' ? 'ratio-16-9' : renderAspectRatio === '1:1' ? 'ratio-1-1' : 'ratio-9-16'}`}
+                    >
+                      {/* Widescreen ratio badge */}
+                      <div className="editor-ratio-badge">
+                        {renderAspectRatio} · {renderResolution}p
+                      </div>
+
+                      {/* Blurred cover art background on the frame */}
+                      <div 
+                        className="editor-preview-bg" 
+                        style={{ backgroundImage: artworkUrl ? `url(${artworkUrl})` : 'none' }}
+                      />
+
+                      {/* Floating player card */}
+                      <div className="editor-preview-card">
+                        <div className="editor-preview-card-art">
+                          {artworkUrl ? (
+                            <img src={artworkUrl} alt="Cover" />
+                          ) : (
+                            <div className="artwork-placeholder">🎵</div>
+                          )}
+                        </div>
+                        <div className="editor-preview-card-info">
+                          <div className="editor-preview-card-title-row" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
+                            <div className="editor-preview-card-title" style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>{songTitle}</div>
+                            <canvas ref={editorVisualizerRef} className="ui-visualizer" style={{ width: '40px', height: '16px', flexShrink: 0, opacity: 0.75 }} />
+                          </div>
+                          <div className="editor-preview-card-artist" style={{ textAlign: 'left' }}>{songArtist}</div>
+                          
+                          {/* Mini seekbar */}
+                          <div className="editor-preview-card-seekbar">
+                            <div 
+                              className="editor-preview-card-seek-fill" 
+                              style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
+                            ></div>
+                          </div>
+
+                          {/* Mini Time Markers */}
+                          <div className="editor-preview-card-time-labels" style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: 'rgba(255,255,255,0.4)', marginTop: '2px', width: '100%' }}>
+                            <span>{formatTime(currentTime)}</span>
+                            <span>-{formatTime(duration > 0 ? (duration - currentTime) : 0)}</span>
+                          </div>
+
+                          {/* Mini Controls Row */}
+                          <div className="editor-preview-card-controls-row" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '14px', marginTop: '6px', position: 'relative', width: '100%' }}>
+                            {/* Star button */}
+                            <i className="fa-regular fa-star" style={{ position: 'absolute', left: '0', fontSize: '10px', opacity: 0.5, color: '#fff' }}></i>
+                            
+                            {/* Playback controls */}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', color: '#fff' }}>
+                              <i className="fa-solid fa-backward-step" style={{ fontSize: '10px', opacity: 0.8 }}></i>
+                              <i className={`fa-solid ${getActualPlaying() ? 'fa-pause' : 'fa-play'}`} style={{ fontSize: '12px' }}></i>
+                              <i className="fa-solid fa-forward-step" style={{ fontSize: '10px', opacity: 0.8 }}></i>
+                            </div>
+                          </div>
+
+                          {/* Mini Volume Bar */}
+                          <div className="editor-preview-card-volume" style={{ display: 'flex', alignItems: 'center', gap: '6px', width: '100%', marginTop: '6px', opacity: 0.5, color: '#fff' }}>
+                            <i className="fa-solid fa-volume-low" style={{ fontSize: '8px' }}></i>
+                            <div style={{ flex: 1, height: '2px', background: 'rgba(255,255,255,0.15)', borderRadius: '1px' }}>
+                              <div style={{ width: `${volume * 100}%`, height: '100%', background: '#fff', borderRadius: '1px' }}></div>
+                            </div>
+                            <i className="fa-solid fa-volume-high" style={{ fontSize: '8px' }}></i>
+                          </div>
+
+                          {/* Mini Device Selector Pill */}
+                          <div className="editor-preview-card-device" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', background: 'rgba(255,255,255,0.08)', borderRadius: '12px', padding: '3px 8px', fontSize: '8px', fontWeight: '600', color: '#fff', width: 'fit-content', margin: '6px auto 0' }}>
+                            <img src="/airplay.png" alt="AirPlay" style={{ width: '8px', height: '8px', opacity: 0.8 }} />
+                            <span>{deviceName}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: Settings */}
+                <div className="editor-right-column">
+                  {/* Export Settings Panel */}
+                  <div className="editor-settings-panel">
+                    <h3 className="editor-settings-title">EXPORT SETTINGS</h3>
+                    
+                    {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+                      <div className="mobile-render-warning" style={{ marginBottom: '12px' }}>
+                        ⚠️ Render di HP rentan crash. Disarankan 720p & 30 FPS.
+                      </div>
+                    )}
+
+                    <div className="editor-settings-grid">
+                      <div className="editor-setting-card">
+                        <span className="editor-setting-label">RESOLUTION</span>
+                        <div className="editor-setting-options">
+                          <button 
+                            className={`editor-opt-btn ${renderResolution === '720' ? 'active' : ''}`}
+                            onClick={() => setRenderResolution('720')}
+                          >720p</button>
+                          <button 
+                            className={`editor-opt-btn ${renderResolution === '1080' ? 'active' : ''}`}
+                            onClick={() => setRenderResolution('1080')}
+                          >1080p</button>
+                        </div>
+                      </div>
+                      
+                      <div className="editor-setting-card">
+                        <span className="editor-setting-label">FRAME RATE</span>
+                        <div className="editor-setting-options">
+                          <button 
+                            className={`editor-opt-btn ${renderFps === '30' ? 'active' : ''}`}
+                            onClick={() => setRenderFps('30')}
+                          >30 fps</button>
+                          <button 
+                            className={`editor-opt-btn ${renderFps === '60' ? 'active' : ''}`}
+                            onClick={() => setRenderFps('60')}
+                          >60 fps</button>
+                        </div>
+                      </div>
+
+                      <div className="editor-setting-card">
+                        <span className="editor-setting-label">ASPECT RATIO</span>
+                        <div className="editor-setting-options">
+                          <button 
+                            className={`editor-opt-btn ${renderAspectRatio === '16:9' ? 'active' : ''}`}
+                            onClick={() => setRenderAspectRatio('16:9')}
+                          >16:9 (Landscape)</button>
+                          <button 
+                            className={`editor-opt-btn ${renderAspectRatio === '9:16' ? 'active' : ''}`}
+                            onClick={() => setRenderAspectRatio('9:16')}
+                          >9:16 (Portrait)</button>
+                          <button 
+                            className={`editor-opt-btn ${renderAspectRatio === '1:1' ? 'active' : ''}`}
+                            onClick={() => setRenderAspectRatio('1:1')}
+                          >1:1 (Square)</button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-section">
+                      <div className="editor-fade-toggle">
+                        <span className="editor-setting-label">VOLUME FADE IN/OUT</span>
+                        <label className="editor-switch">
+                          <input 
+                            type="checkbox" 
+                            checked={isAudioFadeEnabled} 
+                            onChange={(e) => setIsAudioFadeEnabled(e.target.checked)} 
+                          />
+                          <span className="editor-switch-slider"></span>
+                        </label>
+                      </div>
+                      {isAudioFadeEnabled && (
+                        <div className="editor-fade-duration">
+                          <span className="editor-setting-sublabel">Durasi Fade</span>
+                          <div className="editor-fade-input-wrap">
+                            <input 
+                              type="range" 
+                              min="0.5" max="10" step="0.5"
+                              value={audioFadeDuration}
+                              onChange={(e) => setAudioFadeDuration(e.target.value)}
+                              className="editor-fade-slider"
+                            />
+                            <span className="editor-fade-value">{audioFadeDuration}s</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Bottom Section: Timeline & Export Button (Full Width) */}
+              <div className="editor-bottom-section">
+                {/* Timeline Section */}
+                <div className="editor-timeline-section">
+                  <div className="editor-time-labels">
+                    <span className="timeline-limit-start">00:00</span>
+                    <span className="timeline-limit-end">{formatTime(duration)}</span>
+                  </div>
+                  <div className="editor-timeline-track"
+                    onMouseDown={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                      const timeSec = pct * duration;
+                      const startSecs = parseTimeToSeconds(renderStart);
+                      const endSecs = parseTimeToSeconds(renderEnd);
+                      const clampedTime = Math.max(startSecs, Math.min(endSecs, timeSec));
+                      const player = getActivePlayer();
+                      if (player) {
+                        player.currentTime = clampedTime;
+                        setCurrentTime(clampedTime);
+                      }
+                    }}
+                  >
+                    {/* Audio waveform visualization in the background */}
+                    <div className="editor-waveform">
+                      {waveformPeaks.map((peak, idx) => {
+                        const pct = (idx / waveformPeaks.length) * 100;
+                        const startPct = duration > 0 ? (parseTimeToSeconds(renderStart) / duration) * 100 : 0;
+                        const endPct = duration > 0 ? (parseTimeToSeconds(renderEnd) / duration) * 100 : 100;
+                        const isActive = pct >= startPct && pct <= endPct;
+                        return (
+                          <div 
+                            key={idx} 
+                            className="editor-waveform-bar" 
+                            style={{ 
+                              height: `${peak * 100}%`,
+                              background: isActive ? 'rgba(99, 102, 241, 0.65)' : 'rgba(255, 255, 255, 0.12)',
+                              boxShadow: isActive ? '0 0 4px rgba(99, 102, 241, 0.2)' : 'none',
+                              transition: 'background 0.2s ease'
+                            }}
+                          />
+                        );
+                      })}
+                    </div>
+
+                    {/* Selected range highlight */}
+                    <div className="editor-range-highlight" style={{
+                      left: `${duration > 0 ? (parseTimeToSeconds(renderStart) / duration) * 100 : 0}%`,
+                      width: `${duration > 0 ? ((parseTimeToSeconds(renderEnd) - parseTimeToSeconds(renderStart)) / duration) * 100 : 100}%`
+                    }} />
+
+                    {/* Playhead */}
+                    <div className="editor-playhead" style={{
+                      left: `${duration > 0 ? (currentTime / duration) * 100 : 0}%`
+                    }} />
+
+                    {/* Left handle */}
+                    <div className="editor-handle editor-handle-left" style={{
+                      left: `${duration > 0 ? (parseTimeToSeconds(renderStart) / duration) * 100 : 0}%`
+                    }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        const track = e.currentTarget.parentElement;
+                        const onMove = (ev) => {
+                          const rect = track.getBoundingClientRect();
+                          const pct = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+                          const timeSec = Math.floor(pct * duration);
+                          const endSecs = parseTimeToSeconds(renderEnd);
+                          const clampedStart = Math.min(endSecs, timeSec);
+                          setRenderStart(formatTime(clampedStart));
+                          const player = getActivePlayer();
+                          if (player && player.currentTime < clampedStart) {
+                            player.currentTime = clampedStart;
+                            setCurrentTime(clampedStart);
+                          }
+                        };
+                        const onUp = () => {
+                          document.removeEventListener('mousemove', onMove);
+                          document.removeEventListener('mouseup', onUp);
+                        };
+                        document.addEventListener('mousemove', onMove);
+                        document.addEventListener('mouseup', onUp);
+                      }}
+                      onTouchStart={(e) => {
+                        e.stopPropagation();
+                        const track = e.currentTarget.parentElement;
+                        const onMove = (ev) => {
+                          const rect = track.getBoundingClientRect();
+                          const touch = ev.touches[0];
+                          const pct = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                          const timeSec = Math.floor(pct * duration);
+                          const endSecs = parseTimeToSeconds(renderEnd);
+                          const clampedStart = Math.min(endSecs, timeSec);
+                          setRenderStart(formatTime(clampedStart));
+                          const player = getActivePlayer();
+                          if (player && player.currentTime < clampedStart) {
+                            player.currentTime = clampedStart;
+                            setCurrentTime(clampedStart);
+                          }
+                        };
+                        const onEnd = () => {
+                          document.removeEventListener('touchmove', onMove);
+                          document.removeEventListener('touchend', onEnd);
+                        };
+                        document.addEventListener('touchmove', onMove, { passive: false });
+                        document.addEventListener('touchend', onEnd);
+                      }}
+                    >
+                      <div className="editor-handle-grip">
+                        <div /><div /><div />
+                      </div>
+                    </div>
+
+                    {/* Right handle */}
+                    <div className="editor-handle editor-handle-right" style={{
+                      left: `${duration > 0 ? (parseTimeToSeconds(renderEnd) / duration) * 100 : 100}%`
+                    }}
+                      onMouseDown={(e) => {
+                        e.stopPropagation();
+                        const track = e.currentTarget.parentElement;
+                        const onMove = (ev) => {
+                          const rect = track.getBoundingClientRect();
+                          const pct = Math.max(0, Math.min(1, (ev.clientX - rect.left) / rect.width));
+                          const timeSec = Math.floor(pct * duration);
+                          const startSecs = parseTimeToSeconds(renderStart);
+                          const clampedEnd = Math.max(startSecs, timeSec);
+                          setRenderEnd(formatTime(clampedEnd));
+                          const player = getActivePlayer();
+                          if (player && player.currentTime > clampedEnd) {
+                            player.currentTime = clampedEnd;
+                            setCurrentTime(clampedEnd);
+                          }
+                        };
+                        const onUp = () => {
+                          document.removeEventListener('mousemove', onMove);
+                          document.removeEventListener('mouseup', onUp);
+                        };
+                        document.addEventListener('mousemove', onMove);
+                        document.addEventListener('mouseup', onUp);
+                      }}
+                      onTouchStart={(e) => {
+                        e.stopPropagation();
+                        const track = e.currentTarget.parentElement;
+                        const onMove = (ev) => {
+                          const rect = track.getBoundingClientRect();
+                          const touch = ev.touches[0];
+                          const pct = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                          const timeSec = Math.floor(pct * duration);
+                          const startSecs = parseTimeToSeconds(renderStart);
+                          const clampedEnd = Math.max(startSecs, timeSec);
+                          setRenderEnd(formatTime(clampedEnd));
+                          const player = getActivePlayer();
+                          if (player && player.currentTime > clampedEnd) {
+                            player.currentTime = clampedEnd;
+                            setCurrentTime(clampedEnd);
+                          }
+                        };
+                        const onEnd = () => {
+                          document.removeEventListener('touchmove', onMove);
+                          document.removeEventListener('touchend', onEnd);
+                        };
+                        document.addEventListener('touchmove', onMove, { passive: false });
+                        document.addEventListener('touchend', onEnd);
+                      }}
+                    >
+                      <div className="editor-handle-grip">
+                        <div /><div /><div />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Crop Range and Duration display */}
+                  <div className="timeline-range-labels">
+                    <span className="crop-start-label">{renderStart}</span>
+                    <span className="editor-duration-text">
+                      Duration: {(() => {
+                        const s = parseTimeToSeconds(renderEnd) - parseTimeToSeconds(renderStart);
+                        return formatTime(Math.max(0, s));
+                      })()}
+                    </span>
+                    <span className="crop-end-label">{renderEnd}</span>
+                  </div>
+                </div>
+
+                {/* Footer Buttons Split */}
+                <div className="editor-footer-actions">
+                  <button className="editor-preview-action-btn" onClick={togglePlay}>
+                    <i className={`fa-solid ${getActualPlaying() ? 'fa-pause' : 'fa-play'}`} style={{ marginRight: '8px' }}></i>
+                    {getActualPlaying() ? 'Pause Preview' : 'Play Preview'}
+                  </button>
+                  
+                  <button className="editor-export-btn" onClick={() => {
+                    setShowEditorMode(false);
+                    toggleVideoRecord();
+                  }}>
+                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: '8px' }}>
+                      <polygon points="5 3 19 12 5 21 5 3" fill="currentColor" />
+                    </svg>
+                    Export Video
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Render Overlay — Full-screen progress during recording/converting/done */}
       {renderPhase !== 'idle' && (
