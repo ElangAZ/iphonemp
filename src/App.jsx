@@ -37,7 +37,7 @@ function App() {
   const [renderEnd, setRenderEnd] = useState('0:30');
   const [renderResolution, setRenderResolution] = useState('720'); // '720' or '1080'
   const [renderFps, setRenderFps] = useState('30'); // '30' or '60'
-  const [renderAspectRatio, setRenderAspectRatio] = useState('16:9'); // '16:9' or '9:16' or '1:1'
+  const [renderAspectRatio, setRenderAspectRatio] = useState('9:16'); // '16:9' or '9:16' or '1:1'
   const [renderCodec, setRenderCodec] = useState('h264'); // 'h264'
   const [renderBitrate, setRenderBitrate] = useState('3500'); // kbps: '2000', '3500', '6000'
   const [renderAudioQuality, setRenderAudioQuality] = useState('256'); // kbps: '128', '256', '320'
