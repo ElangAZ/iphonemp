@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { activateLicense, revalidateStoredLicense, getStoredLicense } from './keyauth';
+import { activateLicense, revalidateStoredLicense, getStoredLicense, getOrCreateDeviceHwid } from './keyauth';
 import './KeyAuthGate.css';
 
 /**
@@ -13,10 +13,12 @@ export default function KeyAuthGate({ onAuthenticated }) {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState({ text: '', type: '' }); // type: 'error' | 'success'
   const [isFadingOut, setIsFadingOut] = useState(false);
+  const [hwid, setHwid] = useState('');
   const inputRef = useRef(null);
 
   // On mount, check if we have a stored license
   useEffect(() => {
+    setHwid(getOrCreateDeviceHwid());
     const checkStored = async () => {
       const stored = getStoredLicense();
       if (!stored) {
@@ -155,7 +157,12 @@ export default function KeyAuthGate({ onAuthenticated }) {
 
           {/* Footer */}
           <div className="license-gate-footer">
-            senux Player v1.0 · Protected by KeyAuth
+            <div>senux Player v1.0 · Protected by KeyAuth</div>
+            {hwid && (
+              <div className="license-gate-hwid-text" style={{ fontSize: '10px', marginTop: '6px', opacity: 0.5, userSelect: 'all', fontFamily: 'monospace' }}>
+                Device ID: {hwid}
+              </div>
+            )}
           </div>
         </div>
       )}

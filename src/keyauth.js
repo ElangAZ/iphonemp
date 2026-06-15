@@ -39,6 +39,27 @@ export async function initSession() {
 }
 
 /**
+ * Get or generate a persistent unique hardware ID for this browser/device installation
+ * @returns {string} - The unique HWID (minimum 20 characters)
+ */
+export function getOrCreateDeviceHwid() {
+  const HWID_STORAGE_KEY = 'senux_device_hwid';
+  let hwid = localStorage.getItem(HWID_STORAGE_KEY);
+  
+  if (!hwid) {
+    const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let randomStr = 'senux-';
+    for (let i = 0; i < 26; i++) {
+      randomStr += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    hwid = randomStr;
+    localStorage.setItem(HWID_STORAGE_KEY, hwid);
+  }
+  
+  return hwid;
+}
+
+/**
  * Validate a license key against KeyAuth
  * @param {string} key - The license key to validate
  * @param {string} sessionId - The session ID from init
@@ -52,7 +73,7 @@ export async function validateLicense(key, sessionId) {
       sessionid: sessionId,
       name: KEYAUTH_CONFIG.name,
       ownerid: KEYAUTH_CONFIG.ownerid,
-      hwid: 'senux-web-player-app',
+      hwid: getOrCreateDeviceHwid(),
     });
 
     const response = await fetch(`${KEYAUTH_CONFIG.apiUrl}?${params.toString()}`);
