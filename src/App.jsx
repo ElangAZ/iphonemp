@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
-import GlassSurface from './GlassSurface';
+import KeyAuthGate from './KeyAuthGate';
 
 function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -2154,6 +2155,11 @@ function App() {
       cancelAnimationFrame(animationFrameId);
     };
   }, [isPlaying]);
+
+  // If not authenticated, show KeyAuth license gate
+  if (!isAuthenticated) {
+    return <KeyAuthGate onAuthenticated={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <>
