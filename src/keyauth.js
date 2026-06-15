@@ -52,6 +52,7 @@ export async function validateLicense(key, sessionId) {
       sessionid: sessionId,
       name: KEYAUTH_CONFIG.name,
       ownerid: KEYAUTH_CONFIG.ownerid,
+      hwid: 'senux-web-player-app',
     });
 
     const response = await fetch(`${KEYAUTH_CONFIG.apiUrl}?${params.toString()}`);

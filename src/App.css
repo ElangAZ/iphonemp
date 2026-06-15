@@ -111,24 +111,29 @@ video.bg-artwork-overlay.bg-cover-video {
   width: 90vw;
   max-width: 390px;
   height: auto;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(0, 0, 0, 0.40) 100%
-  );
-  backdrop-filter: blur(60px) saturate(1.1);
-  -webkit-backdrop-filter: blur(60px) saturate(1.1);
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(60px) saturate(1.0) brightness(0.85);
+  -webkit-backdrop-filter: blur(60px) saturate(1.0) brightness(0.85);
   border-radius: 55px;
-  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border: 2px solid rgba(255, 255, 255, 0.15);
   box-shadow:
-    0 60px 120px rgba(0, 0, 0, 0.90),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.30);
+    0 60px 120px rgba(0, 0, 0, 0.90);
   padding: 0;
   overflow: hidden;
   position: relative;
   display: flex;
   flex-direction: column;
+}
+
+/* Dark glassmorphic overlay to match canvas render */
+.player::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 0;
 }
 
 /* Artwork area */
@@ -2386,17 +2391,12 @@ video.bg-artwork-overlay.bg-cover-video {
 /* Editor preview floating card */
 .editor-preview-card {
   width: 155px;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 255, 255, 0.03) 0%,
-    rgba(0, 0, 0, 0.40) 100%
-  );
-  backdrop-filter: blur(40px) saturate(1.1);
-  -webkit-backdrop-filter: blur(40px) saturate(1.1);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(40px) saturate(1.0) brightness(0.85);
+  -webkit-backdrop-filter: blur(40px) saturate(1.0) brightness(0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
   box-shadow:
-    0 15px 35px rgba(0, 0, 0, 0.5),
-    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    0 15px 35px rgba(0, 0, 0, 0.5);
   border-radius: 18px;
   padding: 14px;
   display: flex;
@@ -2405,4 +2405,15 @@ video.bg-artwork-overlay.bg-cover-video {
   gap: 10px;
   transition: all 0.3s ease;
   overflow: hidden;
+  position: relative;
+}
+
+.editor-preview-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(255, 255, 255, 0.05);
+  pointer-events: none;
+  z-index: 0;
 }
