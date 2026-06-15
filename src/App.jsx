@@ -23,6 +23,9 @@ function App() {
   const [showEditorMode, setShowEditorMode] = useState(false);
   const [playerOrientation, setPlayerOrientation] = useState('portrait'); // 'portrait' or 'landscape'
   const [isCoverVideo, setIsCoverVideo] = useState(false); // Whether cover art is a video file
+  const [songUrl, setSongUrl] = useState('');
+  const bgVideoRef = useRef(null);
+  const bgCoverVideoRef = useRef(null);
 
   // Unified render phase state machine
   const [renderPhase, setRenderPhase] = useState('idle'); // 'idle', 'recording', 'converting', 'done', 'error'
@@ -297,6 +300,7 @@ function App() {
     songFileRef.current = file;
     generateWaveform(file);
     const url = URL.createObjectURL(file);
+    setSongUrl(url);
     const fileIsVideo = file.type.startsWith('video/');
 
     setIsPlaying(false);
@@ -2017,6 +2021,11 @@ function App() {
       }
 
       setCurrentTime(player.currentTime);
+      if (isVideo && bgVideoRef.current) {
+        if (Math.abs(bgVideoRef.current.currentTime - player.currentTime) > 0.25) {
+          bgVideoRef.current.currentTime = player.currentTime;
+        }
+      }
       // Automatically stop rendering once custom end time limit is met
       if (isRecordingRef.current) {
         const startSecs = parseTimeToSeconds(renderStartRef.current);
@@ -2057,6 +2066,23 @@ function App() {
   // Keep React state in sync with native playback events
   const handlePlay = () => setIsPlaying(true);
   const handlePause = () => setIsPlaying(false);
+
+  // Sync background and cover video elements with playback state
+  useEffect(() => {
+    const bgVideo = bgVideoRef.current;
+    const coverVideo = coverVideoRef.current;
+    const bgCoverVideo = bgCoverVideoRef.current;
+    
+    if (isPlaying) {
+      if (bgVideo && bgVideo.paused) bgVideo.play().catch(e => {});
+      if (coverVideo && coverVideo.paused) coverVideo.play().catch(e => {});
+      if (bgCoverVideo && bgCoverVideo.paused) bgCoverVideo.play().catch(e => {});
+    } else {
+      if (bgVideo && !bgVideo.paused) bgVideo.pause();
+      if (coverVideo && !coverVideo.paused) coverVideo.pause();
+      if (bgCoverVideo && !bgCoverVideo.paused) bgCoverVideo.pause();
+    }
+  }, [isPlaying, isVideo, isCoverVideo, songUrl, artworkUrl]);
 
   // Live UI Visualizer Loop
   useEffect(() => {
@@ -2171,9 +2197,22 @@ function App() {
       {/* Blurred cover video background (when cover is video) */}
       {isCoverVideo && artworkUrl && (
         <video
+          ref={bgCoverVideoRef}
           className="bg-artwork-overlay bg-cover-video"
           src={artworkUrl}
           autoPlay
+          loop
+          muted
+          playsInline
+          style={{ objectFit: 'cover', filter: 'blur(40px) saturate(1.7) brightness(0.6)', transform: 'scale(1.3)' }}
+        />
+      )}
+      {/* Blurred song video background (when song is video and no custom cover is set) */}
+      {isVideo && !artworkUrl && songUrl && (
+        <video
+          ref={bgVideoRef}
+          className="bg-artwork-overlay bg-cover-video"
+          src={songUrl}
           loop
           muted
           playsInline
