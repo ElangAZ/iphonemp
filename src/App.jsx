@@ -1527,49 +1527,51 @@ function App() {
           ctx.moveTo(-9, -6); ctx.lineTo(-1, 0); ctx.lineTo(-9, 6); ctx.closePath();
           ctx.moveTo(1, -6); ctx.lineTo(9, 0); ctx.lineTo(1, 6); ctx.closePath();
           ctx.fill(); ctx.stroke();
-          ctx.restore();
+           ctx.restore();
 
-          // Bottom volume slider & device pill row (all on the same horizontal line)
-          const volY = ctrlY + 68;
+          // Volume bar
+          const volY = ctrlY + 65;
+          const volX = detailsX + 40;
+          const volWidth = detailsW - 80;
 
-          // Calculate pill size first to position volume slider correctly
-          ctx.font = '600 20px Inter';
-          const textW = ctx.measureText(deviceName).width;
-          const pillH = 46;
-          const pillW = 26 + 18 + 10 + textW + 26;
-          const pillX = detailsX + detailsW - pillW;
-          const pillY = volY - 23; // centered vertically with slider center
-
-          // 1. Volume Icon (Low) on the left
           ctx.save();
           ctx.globalAlpha = 0.8;
           if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, detailsX, volY - 10, 19, 20);
+            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 28, volY - 5, 17, 18.4);
           }
           ctx.restore();
 
-          // 2. Volume track in the middle (between speaker icon and device pill)
-          const volX = detailsX + 32;
-          const volWidth = detailsW - 32 - pillW - 20;
-
           ctx.beginPath();
-          ctx.roundRect(volX, volY - 4, volWidth, 8, 4);
+          ctx.roundRect(volX, volY, volWidth, 8, 4);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
           ctx.fill();
           ctx.beginPath();
-          ctx.roundRect(volX, volY - 4, volWidth * volume, 8, 4);
+          ctx.roundRect(volX, volY, volWidth * volume, 8, 4);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
           ctx.fill();
 
-          // 3. Device Pill on the right
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 5, 24.4, 18.4);
+          }
+          ctx.restore();
+
+          // Device pill
+          ctx.font = '600 18px Inter';
+          const textW = ctx.measureText(deviceName).width;
+          const pillY = volY + 38;
+          const pillW = 26 + 18 + 10 + textW + 26;
+          const pillH = 42;
+          const pillX = btnCenter - pillW / 2;
           ctx.beginPath();
-          ctx.roundRect(pillX, pillY, pillW, pillH, 23);
+          ctx.roundRect(pillX, pillY, pillW, pillH, 21);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
           ctx.fill();
 
           if (airplayImgRef.current && airplayImgRef.current.complete) {
             ctx.save();
-            ctx.translate(pillX + 26 + 9, pillY + 23);
+            ctx.translate(pillX + 26 + 9, pillY + 21);
             ctx.scale(0.9, 0.9);
             ctx.globalAlpha = 1.0;
             const img = airplayImgRef.current;
@@ -1579,10 +1581,10 @@ function App() {
           }
 
           ctx.fillStyle = '#ffffff';
-          ctx.font = '600 20px Inter';
+          ctx.font = '600 18px Inter';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(deviceName, pillX + 52, pillY + 23);
+          ctx.fillText(deviceName, pillX + 52, pillY + 21);
 
           ctx.restore(); // Restore scaled coordinates
 
