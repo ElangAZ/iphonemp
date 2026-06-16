@@ -1290,391 +1290,628 @@ function App() {
           ctx.fillRect(0, 0, canvas.width, canvas.height);
         }
 
-        // Calculate scale and offset to fit the 720x1280 virtual card layout inside the actual canvas size
-        const scale = canvas.height / 1280;
-        const offsetX = (canvas.width - 720 * scale) / 2;
-        ctx.save();
-        ctx.translate(offsetX, 0);
-        ctx.scale(scale, scale);
+        // ===== LAYOUT BRANCH: Landscape (16:9) vs Portrait/Square =====
+        const isLandscapeRender = renderAspectRatio === '16:9';
 
-        const cardWidth = 560;
-        const cardHeight = 960;
-        const cardX = (720 - cardWidth) / 2;
-        const cardY = (1280 - cardHeight) / 2;
-        const cardRadius = 75;
+        if (isLandscapeRender) {
+          // ===== LANDSCAPE 16:9 CARD LAYOUT =====
+          // Virtual coordinate system: 1280x720 (wide)
+          const vw = 1280;
+          const vh = 720;
+          const scale = canvas.width / vw;
+          ctx.save();
+          ctx.scale(scale, scale);
 
-        ctx.save();
-        ctx.beginPath();
-        ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
-        // Premium Glassmorphic Canvas Fill
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
-        ctx.fill();
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
-        ctx.fill();
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-        ctx.restore();
+          // Landscape card: cover art left, details right
+          const cardPad = 40;
+          const cardWidth = vw - cardPad * 2;
+          const cardHeight = vh - cardPad * 2;
+          const cardX = cardPad;
+          const cardY = cardPad;
+          const cardRadius = 45;
 
-        const artPadding = 35;
-        const artSize = cardWidth - (artPadding * 2);
-        const artX = cardX + artPadding;
-        const artY = cardY + artPadding;
-        const artRadius = 20;
-
-        if (coverVidEl && coverVidEl.readyState >= 2) {
-          // Video is playing live — just draw current frame directly (no seek = no flicker)
+          // Draw card background
           ctx.save();
           ctx.beginPath();
-          ctx.roundRect(artX, artY, artSize, artSize, artRadius);
-          ctx.clip();
-          const vw = coverVidEl.videoWidth || artSize;
-          const vh = coverVidEl.videoHeight || artSize;
-          const mRatio = vw / vh;
-          let sx = 0, sy = 0, sw = vw, sh = vh;
-          if (mRatio > 1) {
-            sw = vh;
-            sx = (vw - sw) / 2;
-          } else {
-            sh = vw;
-            sy = (vh - sh) / 2;
-          }
-          ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
+          ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.fill();
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.lineWidth = 2.0;
+          ctx.stroke();
           ctx.restore();
-        } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
-          ctx.save();
-          ctx.beginPath();
-          ctx.roundRect(artX, artY, artSize, artSize, artRadius);
-          ctx.clip();
-          const mRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
-          let sx = 0, sy = 0, sw = coverImgObj.naturalWidth, sh = coverImgObj.naturalHeight;
-          if (mRatio > 1) {
-            sw = coverImgObj.naturalHeight;
-            sx = (coverImgObj.naturalWidth - sw) / 2;
-          } else {
-            sh = coverImgObj.naturalWidth;
-            sy = (coverImgObj.naturalHeight - sh) / 2;
-          }
-          ctx.drawImage(coverImgObj, sx, sy, sw, sh, artX, artY, artSize, artSize);
-          ctx.restore();
-        }
 
-        const infoY = artY + artSize + 60;
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '800 22px Inter';
-        ctx.textAlign = 'left';
+          // Cover art (left side, square)
+          const artPad = 22;
+          const artSize = cardHeight - artPad * 2;
+          const artX = cardX + artPad;
+          const artY = cardY + artPad;
+          const artRadius = 16;
 
-        const maxTextWidth = cardWidth - (artPadding * 2) - 80;
-        const titleWidth = ctx.measureText(songTitle).width;
-        
-        if (titleWidth > maxTextWidth) {
-          // Clear offscreen canvas
-          offCtx.clearRect(0, 0, maxTextWidth, 60);
-          offCtx.globalCompositeOperation = 'source-over';
-          
-          // Draw scrolling text on offscreen canvas
-          offCtx.fillStyle = '#ffffff';
-          offCtx.font = '800 22px Inter';
-          offCtx.textAlign = 'left';
-          offCtx.textBaseline = 'middle';
-          
-          const textY = 30;
-          offCtx.fillText(songTitle, renderScrollOffset, textY);
-          offCtx.fillText(songTitle, renderScrollOffset + titleWidth + 100, textY);
-          
-          // Mask
-          offCtx.globalCompositeOperation = 'destination-in';
-          const grad = offCtx.createLinearGradient(0, 0, maxTextWidth, 0);
-          
-          if (renderScrollPauseTicks > 0 || Math.abs(renderScrollOffset) < 1) {
-            grad.addColorStop(0, 'rgba(0,0,0,1)');
-            grad.addColorStop(0.9, 'rgba(0,0,0,1)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
-          } else {
-            grad.addColorStop(0, 'rgba(0,0,0,0)');
-            grad.addColorStop(0.08, 'rgba(0,0,0,1)');
-            grad.addColorStop(0.92, 'rgba(0,0,0,1)');
-            grad.addColorStop(1, 'rgba(0,0,0,0)');
+          if (coverVidEl && coverVidEl.readyState >= 2) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+            ctx.clip();
+            const cvw = coverVidEl.videoWidth || artSize;
+            const cvh = coverVidEl.videoHeight || artSize;
+            const mRatio = cvw / cvh;
+            let sx = 0, sy = 0, sw = cvw, sh = cvh;
+            if (mRatio > 1) { sw = cvh; sx = (cvw - sw) / 2; }
+            else { sh = cvw; sy = (cvh - sh) / 2; }
+            ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
+            ctx.restore();
+          } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+            ctx.clip();
+            const mRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
+            let sx = 0, sy = 0, sw = coverImgObj.naturalWidth, sh = coverImgObj.naturalHeight;
+            if (mRatio > 1) { sw = sh; sx = (coverImgObj.naturalWidth - sw) / 2; }
+            else { sh = sw; sy = (coverImgObj.naturalHeight - sh) / 2; }
+            ctx.drawImage(coverImgObj, sx, sy, sw, sh, artX, artY, artSize, artSize);
+            ctx.restore();
           }
+
+          // Right side details area
+          const detailsX = artX + artSize + 28;
+          const detailsW = cardX + cardWidth - detailsX - artPad;
+          const detailsTop = cardY + artPad + 10;
+
+          // Song title
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 24px Inter';
+          ctx.textAlign = 'left';
+          const maxTitleW = detailsW - 60;
+          const titleW = ctx.measureText(songTitle).width;
           
-          offCtx.fillStyle = grad;
-          offCtx.fillRect(0, 0, maxTextWidth, 60);
-          
-          // Draw to main canvas
-          ctx.drawImage(offCanvas, 0, 0, maxTextWidth, 60, cardX + artPadding, infoY - 30, maxTextWidth, 60);
-          
-          // Update scroll offset for next frame
-          const scrollStep = 36 / fps;
-          if (renderScrollPauseTicks > 0) {
-            renderScrollPauseTicks--;
-          } else {
-            renderScrollOffset -= scrollStep;
-            if (Math.abs(renderScrollOffset) >= titleWidth + 100) {
-              renderScrollOffset = 0;
-              renderScrollPauseTicks = Math.round(2 * fps);
+          if (titleW > maxTitleW) {
+            offCtx.clearRect(0, 0, maxTitleW, 60);
+            offCtx.globalCompositeOperation = 'source-over';
+            offCtx.fillStyle = '#ffffff';
+            offCtx.font = '800 24px Inter';
+            offCtx.textAlign = 'left';
+            offCtx.textBaseline = 'middle';
+            offCtx.fillText(songTitle, renderScrollOffset, 30);
+            offCtx.fillText(songTitle, renderScrollOffset + titleW + 100, 30);
+            offCtx.globalCompositeOperation = 'destination-in';
+            const grad = offCtx.createLinearGradient(0, 0, maxTitleW, 0);
+            if (renderScrollPauseTicks > 0 || Math.abs(renderScrollOffset) < 1) {
+              grad.addColorStop(0, 'rgba(0,0,0,1)');
+              grad.addColorStop(0.9, 'rgba(0,0,0,1)');
+              grad.addColorStop(1, 'rgba(0,0,0,0)');
+            } else {
+              grad.addColorStop(0, 'rgba(0,0,0,0)');
+              grad.addColorStop(0.08, 'rgba(0,0,0,1)');
+              grad.addColorStop(0.92, 'rgba(0,0,0,1)');
+              grad.addColorStop(1, 'rgba(0,0,0,0)');
             }
-          }
-        } else {
-          ctx.fillText(songTitle, cardX + artPadding, infoY);
-        }
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.font = '500 20px Inter';
-        ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
-
-        // Draw Spectrum
-        const specBarCount = 6;
-        const specGap = 3;
-        const specHeight = 40;
-        const specBarWidth = 2.5;
-        const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
-        const specX = cardX + cardWidth - artPadding - specTotalWidth;
-        const specCenterY = infoY + 10;
-
-        for (let i = 0; i < specBarCount; i++) {
-          let val = 0;
-          if (i === 0) {
-            let bassSum = magnitudes[0] + magnitudes[1];
-            val = bassSum / 2;
+            offCtx.fillStyle = grad;
+            offCtx.fillRect(0, 0, maxTitleW, 60);
+            ctx.drawImage(offCanvas, 0, 0, maxTitleW, 60, detailsX, detailsTop - 30, maxTitleW, 60);
+            const scrollStep = 36 / fps;
+            if (renderScrollPauseTicks > 0) {
+              renderScrollPauseTicks--;
+            } else {
+              renderScrollOffset -= scrollStep;
+              if (Math.abs(renderScrollOffset) >= titleW + 100) {
+                renderScrollOffset = 0;
+                renderScrollPauseTicks = Math.round(2 * fps);
+              }
+            }
           } else {
-            const freqBins = [20, 36, 56, 80, 110];
-            val = magnitudes[freqBins[i - 1] || 20] || 0;
+            ctx.fillText(songTitle, detailsX, detailsTop);
           }
-          const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
-          const targetHeight = normalized * (specHeight / 2);
-          const decayRate = 0.75;
-          if (targetHeight > videoSmoothHeights[i]) {
-            videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0;
-          } else {
-            videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
+
+          // Artist
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.font = '500 18px Inter';
+          ctx.fillText(songArtist, detailsX, detailsTop + 30);
+
+          // Spectrum (right-aligned with title)
+          const specBarCount = 6;
+          const specGap = 3;
+          const specHeight = 36;
+          const specBarWidth = 2.5;
+          const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
+          const specX = detailsX + detailsW - specTotalWidth;
+          const specCenterY = detailsTop + 10;
+          for (let i = 0; i < specBarCount; i++) {
+            let val = 0;
+            if (i === 0) { val = (magnitudes[0] + magnitudes[1]) / 2; }
+            else { const freqBins = [20, 36, 56, 80, 110]; val = magnitudes[freqBins[i - 1] || 20] || 0; }
+            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+            const targetHeight = normalized * (specHeight / 2);
+            const decayRate = 0.75;
+            if (targetHeight > videoSmoothHeights[i]) { videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0; }
+            else { videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate; }
+            const halfH = Math.max(1.5, videoSmoothHeights[i]);
+            const bx = specX + i * (specBarWidth + specGap);
+            ctx.beginPath();
+            ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
           }
-          const halfH = Math.max(1.5, videoSmoothHeights[i]);
-          const bx = specX + i * (specBarWidth + specGap);
 
+          // Seekbar
+          const seekY = detailsTop + 75;
+          const seekWidth = detailsW;
           ctx.beginPath();
-          ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
+          ctx.roundRect(detailsX, seekY, seekWidth, 10, 5);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.fill();
+          const progressPercent = durationSeconds > 0 ? (currentTime / durationSeconds) : 0;
+          ctx.beginPath();
+          ctx.roundRect(detailsX, seekY, seekWidth * progressPercent, 10, 5);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+
+          // Time labels
           ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.fill();
+          ctx.font = '500 16px Inter';
+          ctx.textAlign = 'left';
+          ctx.fillText(formatTime(currentTime), detailsX, seekY + 38);
+          ctx.textAlign = 'right';
+          ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, detailsX + seekWidth, seekY + 38);
 
-          ctx.beginPath();
-          ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.fill();
-        }
+          // Controls
+          const ctrlY = seekY + 80;
+          const btnCenter = detailsX + detailsW / 2;
 
-        // Seekbar
-        const seekY = infoY + 80;
-        const seekWidth = cardWidth - (artPadding * 2);
-        ctx.beginPath();
-        ctx.roundRect(cardX + artPadding, seekY, seekWidth, 12, 6);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.fill();
-
-        const progressPercent = durationSeconds > 0 ? (currentTime / durationSeconds) : 0;
-        ctx.beginPath();
-        ctx.roundRect(cardX + artPadding, seekY, seekWidth * progressPercent, 12, 6);
-        ctx.fillStyle = '#ffffff';
-        ctx.fill();
-
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-        ctx.font = '500 18px Inter';
-        ctx.textAlign = 'left';
-        ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 48);
-
-        ctx.textAlign = 'right';
-        ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, cardX + cardWidth - artPadding, seekY + 48);
-
-        // Navigation Controls (Skip, Pause)
-        const ctrlY = seekY + 90;
-        const btnCenter = cardX + cardWidth / 2;
-
-        // Star Outline - Leftmost
-        ctx.save();
-        ctx.translate(btnCenter - 190, ctrlY);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.lineWidth = 2.5;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        // Draw a 5-pointed star
-         const spikes = 5;
-         const outerRadius = 22;
-         const innerRadius = 10;
-        let rot = Math.PI / 2 * 3;
-        const step = Math.PI / spikes;
-        ctx.moveTo(0, -outerRadius);
-        for (let i = 0; i < spikes; i++) {
-          let x = Math.cos(rot) * outerRadius;
-          let y = Math.sin(rot) * outerRadius;
-          ctx.lineTo(x, y);
-          rot += step;
-
-          x = Math.cos(rot) * innerRadius;
-          y = Math.sin(rot) * innerRadius;
-          ctx.lineTo(x, y);
-          rot += step;
-        }
-        ctx.closePath();
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.save();
-        ctx.translate(btnCenter - 95, ctrlY);
-        ctx.scale(2.8, 2.4);
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2.0;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-1, -6);
-        ctx.lineTo(-9, 0);
-        ctx.lineTo(-1, 6);
-        ctx.closePath();
-        ctx.moveTo(9, -6);
-        ctx.lineTo(1, 0);
-        ctx.lineTo(9, 6);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-
-        ctx.save();
-        ctx.translate(btnCenter, ctrlY);
-        ctx.scale(2.5, 2.5);
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.roundRect(-7.5, -11, 6, 22, 1.5);
-        ctx.roundRect(1.5, -11, 6, 22, 1.5);
-        ctx.fill();
-        ctx.restore();
-
-        ctx.save();
-        ctx.translate(btnCenter + 95, ctrlY);
-        ctx.scale(2.8, 2.4);
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 2.0;
-        ctx.lineJoin = 'round';
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(-9, -6);
-        ctx.lineTo(-1, 0);
-        ctx.lineTo(-9, 6);
-        ctx.closePath();
-        ctx.moveTo(1, -6);
-        ctx.lineTo(9, 0);
-        ctx.lineTo(1, 6);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-        ctx.restore();
-
-        // Volume bar
-        const volY = ctrlY + 80;
-        const volX = cardX + artPadding + 48;
-        const volWidth = cardWidth - (artPadding * 2) - 96;
-
-        // Left low-volume speaker icon
-        ctx.save();
-        ctx.globalAlpha = 0.8;
-        if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-          ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 32, volY - 6, 20.3, 22);
-        } else {
+          // Star
           ctx.save();
-          ctx.translate(volX - 38, volY - 11);
-          ctx.scale(1.8, 1.8);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-          ctx.beginPath();
-          ctx.moveTo(3, 7);
-          ctx.lineTo(6, 7);
-          ctx.lineTo(10, 3);
-          ctx.lineTo(10, 15);
-          ctx.lineTo(6, 11);
-          ctx.lineTo(3, 11);
-          ctx.closePath();
-          ctx.fill();
-          ctx.restore();
-        }
-        ctx.restore();
-
-        ctx.beginPath();
-        ctx.roundRect(volX, volY, volWidth, 10, 5);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.fill();
-
-        ctx.beginPath();
-        ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
-        ctx.fill();
-
-        // Right high-volume speaker icon
-        ctx.save();
-        ctx.globalAlpha = 0.45;
-        if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-          ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
-        } else {
-          ctx.save();
-          ctx.translate(volX + volWidth + 14, volY - 11);
-          ctx.scale(1.8, 1.8);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.translate(btnCenter - 160, ctrlY);
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-          ctx.lineWidth = 1.8;
-          ctx.lineCap = 'round';
+          ctx.lineWidth = 2.2;
           ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(3, 7);
-          ctx.lineTo(6, 7);
-          ctx.lineTo(10, 3);
-          ctx.lineTo(10, 15);
-          ctx.lineTo(6, 11);
-          ctx.lineTo(3, 11);
+          const spikes = 5;
+          const outerRadius = 18;
+          const innerRadius = 8;
+          let rot = Math.PI / 2 * 3;
+          const step = Math.PI / spikes;
+          ctx.moveTo(0, -outerRadius);
+          for (let i = 0; i < spikes; i++) {
+            ctx.lineTo(Math.cos(rot) * outerRadius, Math.sin(rot) * outerRadius);
+            rot += step;
+            ctx.lineTo(Math.cos(rot) * innerRadius, Math.sin(rot) * innerRadius);
+            rot += step;
+          }
           ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
+
+          // Skip back
+          ctx.save();
+          ctx.translate(btnCenter - 80, ctrlY);
+          ctx.scale(2.4, 2.0);
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.0;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-1, -6); ctx.lineTo(-9, 0); ctx.lineTo(-1, 6); ctx.closePath();
+          ctx.moveTo(9, -6); ctx.lineTo(1, 0); ctx.lineTo(9, 6); ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.restore();
+
+          // Pause icon
+          ctx.save();
+          ctx.translate(btnCenter, ctrlY);
+          ctx.scale(2.2, 2.2);
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.roundRect(-7.5, -11, 6, 22, 1.5);
+          ctx.roundRect(1.5, -11, 6, 22, 1.5);
+          ctx.fill();
+          ctx.restore();
+
+          // Skip forward
+          ctx.save();
+          ctx.translate(btnCenter + 80, ctrlY);
+          ctx.scale(2.4, 2.0);
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.0;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-9, -6); ctx.lineTo(-1, 0); ctx.lineTo(-9, 6); ctx.closePath();
+          ctx.moveTo(1, -6); ctx.lineTo(9, 0); ctx.lineTo(1, 6); ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.restore();
+
+          // Volume bar
+          const volY = ctrlY + 65;
+          const volX = detailsX + 40;
+          const volWidth = detailsW - 80;
+
+          ctx.save();
+          ctx.globalAlpha = 0.8;
+          if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
+            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 28, volY - 5, 17, 18.4);
+          }
+          ctx.restore();
+
+          ctx.beginPath();
+          ctx.roundRect(volX, volY, volWidth, 8, 4);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
           ctx.fill();
           ctx.beginPath();
-          ctx.arc(10, 9, 2.5, -Math.PI / 3, Math.PI / 3, false);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(10, 9, 5.0, -Math.PI / 3, Math.PI / 3, false);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(10, 9, 7.5, -Math.PI / 3, Math.PI / 3, false);
-          ctx.stroke();
-          ctx.restore();
-        }
-        ctx.restore();
+          ctx.roundRect(volX, volY, volWidth * volume, 8, 4);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+          ctx.fill();
 
-        // Device Selector Pill
-        ctx.font = '600 22px Inter';
-        const textW = ctx.measureText(deviceName).width;
-        const pillY = volY + 50;
-        const pillW = 32 + 22 + 14 + textW + 32;
-        const pillH = 52;
-        const pillX = btnCenter - pillW / 2;
-        ctx.beginPath();
-        ctx.roundRect(pillX, pillY, pillW, pillH, 26);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
-        ctx.fill();
-
-        // AirPlay Audio icon inside pill
-        if (airplayImgRef.current && airplayImgRef.current.complete) {
           ctx.save();
-          ctx.translate(pillX + 32 + 11, pillY + 26);
-          ctx.scale(1.05, 1.05);
-          ctx.globalAlpha = 1.0;
-          const img = airplayImgRef.current;
-          const ratio = img.naturalWidth / img.naturalHeight;
-          ctx.drawImage(img, -12 * ratio, -12, 24 * ratio, 24);
+          ctx.globalAlpha = 0.45;
+          if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 5, 24.4, 18.4);
+          }
           ctx.restore();
+
+          // Device pill
+          ctx.font = '600 18px Inter';
+          const textW = ctx.measureText(deviceName).width;
+          const pillY = volY + 38;
+          const pillW = 26 + 18 + 10 + textW + 26;
+          const pillH = 42;
+          const pillX = btnCenter - pillW / 2;
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 21);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.fill();
+
+          if (airplayImgRef.current && airplayImgRef.current.complete) {
+            ctx.save();
+            ctx.translate(pillX + 26 + 9, pillY + 21);
+            ctx.scale(0.9, 0.9);
+            ctx.globalAlpha = 1.0;
+            const img = airplayImgRef.current;
+            const ratio = img.naturalWidth / img.naturalHeight;
+            ctx.drawImage(img, -10 * ratio, -10, 20 * ratio, 20);
+            ctx.restore();
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '600 18px Inter';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(deviceName, pillX + 52, pillY + 21);
+
+          ctx.restore(); // Restore scaled coordinates
+
+        } else {
+          // ===== PORTRAIT / SQUARE CARD LAYOUT (original) =====
+          const scale = canvas.height / 1280;
+          const offsetX = (canvas.width - 720 * scale) / 2;
+          ctx.save();
+          ctx.translate(offsetX, 0);
+          ctx.scale(scale, scale);
+
+          const cardWidth = 560;
+          const cardHeight = 960;
+          const cardX = (720 - cardWidth) / 2;
+          const cardY = (1280 - cardHeight) / 2;
+          const cardRadius = 75;
+
+          ctx.save();
+          ctx.beginPath();
+          ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.fill();
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.lineWidth = 2.0;
+          ctx.stroke();
+          ctx.restore();
+
+          const artPadding = 35;
+          const artSize = cardWidth - (artPadding * 2);
+          const artX = cardX + artPadding;
+          const artY = cardY + artPadding;
+          const artRadius = 20;
+
+          if (coverVidEl && coverVidEl.readyState >= 2) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+            ctx.clip();
+            const vw = coverVidEl.videoWidth || artSize;
+            const vh = coverVidEl.videoHeight || artSize;
+            const mRatio = vw / vh;
+            let sx = 0, sy = 0, sw = vw, sh = vh;
+            if (mRatio > 1) { sw = vh; sx = (vw - sw) / 2; }
+            else { sh = vw; sy = (vh - sh) / 2; }
+            ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
+            ctx.restore();
+          } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.roundRect(artX, artY, artSize, artSize, artRadius);
+            ctx.clip();
+            const mRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
+            let sx = 0, sy = 0, sw = coverImgObj.naturalWidth, sh = coverImgObj.naturalHeight;
+            if (mRatio > 1) { sw = coverImgObj.naturalHeight; sx = (coverImgObj.naturalWidth - sw) / 2; }
+            else { sh = coverImgObj.naturalWidth; sy = (coverImgObj.naturalHeight - sh) / 2; }
+            ctx.drawImage(coverImgObj, sx, sy, sw, sh, artX, artY, artSize, artSize);
+            ctx.restore();
+          }
+
+          const infoY = artY + artSize + 60;
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '800 22px Inter';
+          ctx.textAlign = 'left';
+
+          const maxTextWidth = cardWidth - (artPadding * 2) - 80;
+          const titleWidth = ctx.measureText(songTitle).width;
+          
+          if (titleWidth > maxTextWidth) {
+            offCtx.clearRect(0, 0, maxTextWidth, 60);
+            offCtx.globalCompositeOperation = 'source-over';
+            offCtx.fillStyle = '#ffffff';
+            offCtx.font = '800 22px Inter';
+            offCtx.textAlign = 'left';
+            offCtx.textBaseline = 'middle';
+            const textY = 30;
+            offCtx.fillText(songTitle, renderScrollOffset, textY);
+            offCtx.fillText(songTitle, renderScrollOffset + titleWidth + 100, textY);
+            offCtx.globalCompositeOperation = 'destination-in';
+            const grad = offCtx.createLinearGradient(0, 0, maxTextWidth, 0);
+            if (renderScrollPauseTicks > 0 || Math.abs(renderScrollOffset) < 1) {
+              grad.addColorStop(0, 'rgba(0,0,0,1)');
+              grad.addColorStop(0.9, 'rgba(0,0,0,1)');
+              grad.addColorStop(1, 'rgba(0,0,0,0)');
+            } else {
+              grad.addColorStop(0, 'rgba(0,0,0,0)');
+              grad.addColorStop(0.08, 'rgba(0,0,0,1)');
+              grad.addColorStop(0.92, 'rgba(0,0,0,1)');
+              grad.addColorStop(1, 'rgba(0,0,0,0)');
+            }
+            offCtx.fillStyle = grad;
+            offCtx.fillRect(0, 0, maxTextWidth, 60);
+            ctx.drawImage(offCanvas, 0, 0, maxTextWidth, 60, cardX + artPadding, infoY - 30, maxTextWidth, 60);
+            const scrollStep = 36 / fps;
+            if (renderScrollPauseTicks > 0) {
+              renderScrollPauseTicks--;
+            } else {
+              renderScrollOffset -= scrollStep;
+              if (Math.abs(renderScrollOffset) >= titleWidth + 100) {
+                renderScrollOffset = 0;
+                renderScrollPauseTicks = Math.round(2 * fps);
+              }
+            }
+          } else {
+            ctx.fillText(songTitle, cardX + artPadding, infoY);
+          }
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.font = '500 20px Inter';
+          ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
+
+          // Draw Spectrum
+          const specBarCount = 6;
+          const specGap = 3;
+          const specHeight = 40;
+          const specBarWidth = 2.5;
+          const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
+          const specX = cardX + cardWidth - artPadding - specTotalWidth;
+          const specCenterY = infoY + 10;
+
+          for (let i = 0; i < specBarCount; i++) {
+            let val = 0;
+            if (i === 0) {
+              let bassSum = magnitudes[0] + magnitudes[1];
+              val = bassSum / 2;
+            } else {
+              const freqBins = [20, 36, 56, 80, 110];
+              val = magnitudes[freqBins[i - 1] || 20] || 0;
+            }
+            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+            const targetHeight = normalized * (specHeight / 2);
+            const decayRate = 0.75;
+            if (targetHeight > videoSmoothHeights[i]) {
+              videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0;
+            } else {
+              videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
+            }
+            const halfH = Math.max(1.5, videoSmoothHeights[i]);
+            const bx = specX + i * (specBarWidth + specGap);
+
+            ctx.beginPath();
+            ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+          }
+
+          // Seekbar
+          const seekY = infoY + 80;
+          const seekWidth = cardWidth - (artPadding * 2);
+          ctx.beginPath();
+          ctx.roundRect(cardX + artPadding, seekY, seekWidth, 12, 6);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.fill();
+
+          const progressPercent = durationSeconds > 0 ? (currentTime / durationSeconds) : 0;
+          ctx.beginPath();
+          ctx.roundRect(cardX + artPadding, seekY, seekWidth * progressPercent, 12, 6);
+          ctx.fillStyle = '#ffffff';
+          ctx.fill();
+
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+          ctx.font = '500 18px Inter';
+          ctx.textAlign = 'left';
+          ctx.fillText(formatTime(currentTime), cardX + artPadding, seekY + 48);
+
+          ctx.textAlign = 'right';
+          ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, cardX + cardWidth - artPadding, seekY + 48);
+
+          // Navigation Controls
+          const ctrlY = seekY + 90;
+          const btnCenter = cardX + cardWidth / 2;
+
+          // Star
+          ctx.save();
+          ctx.translate(btnCenter - 190, ctrlY);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+          ctx.lineWidth = 2.5;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          const spikes = 5;
+          const outerRadius = 22;
+          const innerRadius = 10;
+          let rot = Math.PI / 2 * 3;
+          const step = Math.PI / spikes;
+          ctx.moveTo(0, -outerRadius);
+          for (let i = 0; i < spikes; i++) {
+            let x = Math.cos(rot) * outerRadius;
+            let y = Math.sin(rot) * outerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+            x = Math.cos(rot) * innerRadius;
+            y = Math.sin(rot) * innerRadius;
+            ctx.lineTo(x, y);
+            rot += step;
+          }
+          ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(btnCenter - 95, ctrlY);
+          ctx.scale(2.8, 2.4);
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.0;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-1, -6); ctx.lineTo(-9, 0); ctx.lineTo(-1, 6); ctx.closePath();
+          ctx.moveTo(9, -6); ctx.lineTo(1, 0); ctx.lineTo(9, 6); ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(btnCenter, ctrlY);
+          ctx.scale(2.5, 2.5);
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.roundRect(-7.5, -11, 6, 22, 1.5);
+          ctx.roundRect(1.5, -11, 6, 22, 1.5);
+          ctx.fill();
+          ctx.restore();
+
+          ctx.save();
+          ctx.translate(btnCenter + 95, ctrlY);
+          ctx.scale(2.8, 2.4);
+          ctx.fillStyle = '#ffffff';
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.0;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(-9, -6); ctx.lineTo(-1, 0); ctx.lineTo(-9, 6); ctx.closePath();
+          ctx.moveTo(1, -6); ctx.lineTo(9, 0); ctx.lineTo(1, 6); ctx.closePath();
+          ctx.fill(); ctx.stroke();
+          ctx.restore();
+
+          // Volume bar
+          const volY = ctrlY + 80;
+          const volX = cardX + artPadding + 48;
+          const volWidth = cardWidth - (artPadding * 2) - 96;
+
+          ctx.save();
+          ctx.globalAlpha = 0.8;
+          if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
+            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 32, volY - 6, 20.3, 22);
+          } else {
+            ctx.save();
+            ctx.translate(volX - 38, volY - 11);
+            ctx.scale(1.8, 1.8);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.beginPath();
+            ctx.moveTo(3, 7); ctx.lineTo(6, 7); ctx.lineTo(10, 3); ctx.lineTo(10, 15); ctx.lineTo(6, 11); ctx.lineTo(3, 11);
+            ctx.closePath(); ctx.fill();
+            ctx.restore();
+          }
+          ctx.restore();
+
+          ctx.beginPath();
+          ctx.roundRect(volX, volY, volWidth, 10, 5);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.fill();
+          ctx.beginPath();
+          ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+          ctx.fill();
+
+          ctx.save();
+          ctx.globalAlpha = 0.45;
+          if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
+          } else {
+            ctx.save();
+            ctx.translate(volX + volWidth + 14, volY - 11);
+            ctx.scale(1.8, 1.8);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+            ctx.lineWidth = 1.8; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(3, 7); ctx.lineTo(6, 7); ctx.lineTo(10, 3); ctx.lineTo(10, 15); ctx.lineTo(6, 11); ctx.lineTo(3, 11);
+            ctx.closePath(); ctx.fill();
+            ctx.beginPath(); ctx.arc(10, 9, 2.5, -Math.PI / 3, Math.PI / 3, false); ctx.stroke();
+            ctx.beginPath(); ctx.arc(10, 9, 5.0, -Math.PI / 3, Math.PI / 3, false); ctx.stroke();
+            ctx.beginPath(); ctx.arc(10, 9, 7.5, -Math.PI / 3, Math.PI / 3, false); ctx.stroke();
+            ctx.restore();
+          }
+          ctx.restore();
+
+          // Device Selector Pill
+          ctx.font = '600 22px Inter';
+          const textW = ctx.measureText(deviceName).width;
+          const pillY = volY + 50;
+          const pillW = 32 + 22 + 14 + textW + 32;
+          const pillH = 52;
+          const pillX = btnCenter - pillW / 2;
+          ctx.beginPath();
+          ctx.roundRect(pillX, pillY, pillW, pillH, 26);
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
+          ctx.fill();
+
+          if (airplayImgRef.current && airplayImgRef.current.complete) {
+            ctx.save();
+            ctx.translate(pillX + 32 + 11, pillY + 26);
+            ctx.scale(1.05, 1.05);
+            ctx.globalAlpha = 1.0;
+            const img = airplayImgRef.current;
+            const ratio = img.naturalWidth / img.naturalHeight;
+            ctx.drawImage(img, -12 * ratio, -12, 24 * ratio, 24);
+            ctx.restore();
+          }
+
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '600 22px Inter';
+          ctx.textAlign = 'left';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(deviceName, pillX + 66, pillY + 26);
+
+          ctx.restore(); // Restore scaled coordinates
         }
-
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '600 22px Inter';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(deviceName, pillX + 66, pillY + 26);
-
-        ctx.restore(); // Restore scaled coordinates
 
         // Wait if hardware encoder queue is backing up to prevent Out Of Memory crashes
         while (encoder.encodeQueueSize > 5) {
