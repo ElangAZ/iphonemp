@@ -52,6 +52,13 @@ function App() {
   const [usedNativeMp4, setUsedNativeMp4] = useState(false); // Track if native MP4 was used
   const [nativeRenderUri, setNativeRenderUri] = useState('');
 
+  // Landscape layout adjustment states
+  const [landscapeCardWidth, setLandscapeCardWidth] = useState(1000);
+  const [landscapeCardHeight, setLandscapeCardHeight] = useState(440);
+  const [landscapeArtPadding, setLandscapeArtPadding] = useState(26);
+  const [landscapeDetailsGap, setLandscapeDetailsGap] = useState(32);
+  const [landscapeBottomOffset, setLandscapeBottomOffset] = useState(0);
+
   // Initialize with a beautiful default audio waveform pattern (Intro, Verse, Build, Drop, Outro)
   const [waveformPeaks, setWaveformPeaks] = useState(() => {
     const defaultPeaks = [];
@@ -1303,8 +1310,8 @@ function App() {
           ctx.scale(scale, scale);
 
           // Card dimensions and positioning (matching TikTok aspect ratio & centered)
-          const cardWidth = 1000;
-          const cardHeight = 440;
+          const cardWidth = landscapeCardWidth;
+          const cardHeight = landscapeCardHeight;
           const cardX = (vw - cardWidth) / 2;
           const cardY = (vh - cardHeight) / 2;
           const cardRadius = 45;
@@ -1323,7 +1330,7 @@ function App() {
           ctx.restore();
 
           // Cover art (left side, square, clean padding)
-          const artPad = 26;
+          const artPad = landscapeArtPadding;
           const artSize = cardHeight - artPad * 2;
           const artX = cardX + artPad;
           const artY = cardY + artPad;
@@ -1356,7 +1363,7 @@ function App() {
           }
 
           // Right side details area
-          const detailsX = artX + artSize + 32;
+          const detailsX = artX + artSize + landscapeDetailsGap;
           const detailsW = cardX + cardWidth - detailsX - 32;
           const detailsTop = cardY + 36;
 
@@ -1530,7 +1537,7 @@ function App() {
            ctx.restore();
 
           // Volume bar
-          const volY = ctrlY + 65;
+          const volY = ctrlY + 65 + landscapeBottomOffset;
           const volX = detailsX + 40;
           const volWidth = detailsW - 80;
 
@@ -3015,6 +3022,82 @@ function App() {
                         </div>
                       )}
                     </div>
+
+                    {renderAspectRatio === '16:9' && (
+                      <div className="editor-fade-section" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                        <span className="editor-setting-label" style={{ display: 'block', marginBottom: '4px' }}>ATUR POSISI LANDSCAPE</span>
+                        
+                        <div className="editor-fade-duration">
+                          <span className="editor-setting-sublabel">Lebar Card</span>
+                          <div className="editor-fade-input-wrap">
+                            <input 
+                              type="range" 
+                              min="800" max="1200" step="10"
+                              value={landscapeCardWidth}
+                              onChange={(e) => setLandscapeCardWidth(Number(e.target.value))}
+                              className="editor-fade-slider"
+                            />
+                            <span className="editor-fade-value">{landscapeCardWidth}px</span>
+                          </div>
+                        </div>
+
+                        <div className="editor-fade-duration">
+                          <span className="editor-setting-sublabel">Tinggi Card</span>
+                          <div className="editor-fade-input-wrap">
+                            <input 
+                              type="range" 
+                              min="350" max="650" step="10"
+                              value={landscapeCardHeight}
+                              onChange={(e) => setLandscapeCardHeight(Number(e.target.value))}
+                              className="editor-fade-slider"
+                            />
+                            <span className="editor-fade-value">{landscapeCardHeight}px</span>
+                          </div>
+                        </div>
+
+                        <div className="editor-fade-duration">
+                          <span className="editor-setting-sublabel">Padding Cover Art</span>
+                          <div className="editor-fade-input-wrap">
+                            <input 
+                              type="range" 
+                              min="10" max="80" step="2"
+                              value={landscapeArtPadding}
+                              onChange={(e) => setLandscapeArtPadding(Number(e.target.value))}
+                              className="editor-fade-slider"
+                            />
+                            <span className="editor-fade-value">{landscapeArtPadding}px</span>
+                          </div>
+                        </div>
+
+                        <div className="editor-fade-duration">
+                          <span className="editor-setting-sublabel">Jarak Art ke Teks (Gap)</span>
+                          <div className="editor-fade-input-wrap">
+                            <input 
+                              type="range" 
+                              min="10" max="100" step="2"
+                              value={landscapeDetailsGap}
+                              onChange={(e) => setLandscapeDetailsGap(Number(e.target.value))}
+                              className="editor-fade-slider"
+                            />
+                            <span className="editor-fade-value">{landscapeDetailsGap}px</span>
+                          </div>
+                        </div>
+
+                        <div className="editor-fade-duration">
+                          <span className="editor-setting-sublabel">Geser Baris Volume/Pill (Y)</span>
+                          <div className="editor-fade-input-wrap">
+                            <input 
+                              type="range" 
+                              min="-100" max="100" step="2"
+                              value={landscapeBottomOffset}
+                              onChange={(e) => setLandscapeBottomOffset(Number(e.target.value))}
+                              className="editor-fade-slider"
+                            />
+                            <span className="editor-fade-value">{landscapeBottomOffset > 0 ? `+${landscapeBottomOffset}` : landscapeBottomOffset}px</span>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
