@@ -1302,12 +1302,11 @@ function App() {
           ctx.save();
           ctx.scale(scale, scale);
 
-          // Landscape card: cover art left, details right
-          const cardPad = 40;
-          const cardWidth = vw - cardPad * 2;
-          const cardHeight = vh - cardPad * 2;
-          const cardX = cardPad;
-          const cardY = cardPad;
+          // Card dimensions and positioning (matching TikTok aspect ratio & centered)
+          const cardWidth = 1000;
+          const cardHeight = 440;
+          const cardX = (vw - cardWidth) / 2;
+          const cardY = (vh - cardHeight) / 2;
           const cardRadius = 45;
 
           // Draw card background
@@ -1323,12 +1322,12 @@ function App() {
           ctx.stroke();
           ctx.restore();
 
-          // Cover art (left side, square)
-          const artPad = 22;
+          // Cover art (left side, square, clean padding)
+          const artPad = 26;
           const artSize = cardHeight - artPad * 2;
           const artX = cardX + artPad;
           const artY = cardY + artPad;
-          const artRadius = 16;
+          const artRadius = 23;
 
           if (coverVidEl && coverVidEl.readyState >= 2) {
             ctx.save();
@@ -1357,22 +1356,22 @@ function App() {
           }
 
           // Right side details area
-          const detailsX = artX + artSize + 28;
-          const detailsW = cardX + cardWidth - detailsX - artPad;
-          const detailsTop = cardY + artPad + 10;
+          const detailsX = artX + artSize + 32;
+          const detailsW = cardX + cardWidth - detailsX - 32;
+          const detailsTop = cardY + 36;
 
           // Song title
           ctx.fillStyle = '#ffffff';
-          ctx.font = '800 24px Inter';
+          ctx.font = '800 30px Inter';
           ctx.textAlign = 'left';
-          const maxTitleW = detailsW - 60;
+          const maxTitleW = detailsW - 20;
           const titleW = ctx.measureText(songTitle).width;
           
           if (titleW > maxTitleW) {
             offCtx.clearRect(0, 0, maxTitleW, 60);
             offCtx.globalCompositeOperation = 'source-over';
             offCtx.fillStyle = '#ffffff';
-            offCtx.font = '800 24px Inter';
+            offCtx.font = '800 30px Inter';
             offCtx.textAlign = 'left';
             offCtx.textBaseline = 'middle';
             offCtx.fillText(songTitle, renderScrollOffset, 30);
@@ -1391,7 +1390,7 @@ function App() {
             }
             offCtx.fillStyle = grad;
             offCtx.fillRect(0, 0, maxTitleW, 60);
-            ctx.drawImage(offCanvas, 0, 0, maxTitleW, 60, detailsX, detailsTop - 30, maxTitleW, 60);
+            ctx.drawImage(offCanvas, 0, 0, maxTitleW, 60, detailsX, detailsTop - 20, maxTitleW, 60);
             const scrollStep = 36 / fps;
             if (renderScrollPauseTicks > 0) {
               renderScrollPauseTicks--;
@@ -1403,91 +1402,38 @@ function App() {
               }
             }
           } else {
-            ctx.fillText(songTitle, detailsX, detailsTop);
+            ctx.fillText(songTitle, detailsX, detailsTop + 14);
           }
 
           // Artist
           ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-          ctx.font = '500 18px Inter';
-          ctx.fillText(songArtist, detailsX, detailsTop + 30);
-
-          // Spectrum (right-aligned with title)
-          const specBarCount = 6;
-          const specGap = 3;
-          const specHeight = 36;
-          const specBarWidth = 2.5;
-          const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
-          const specX = detailsX + detailsW - specTotalWidth;
-          const specCenterY = detailsTop + 10;
-          for (let i = 0; i < specBarCount; i++) {
-            let val = 0;
-            if (i === 0) { val = (magnitudes[0] + magnitudes[1]) / 2; }
-            else { const freqBins = [20, 36, 56, 80, 110]; val = magnitudes[freqBins[i - 1] || 20] || 0; }
-            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
-            const targetHeight = normalized * (specHeight / 2);
-            const decayRate = 0.75;
-            if (targetHeight > videoSmoothHeights[i]) { videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0; }
-            else { videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate; }
-            const halfH = Math.max(1.5, videoSmoothHeights[i]);
-            const bx = specX + i * (specBarWidth + specGap);
-            ctx.beginPath();
-            ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
-          }
+          ctx.font = '500 22px Inter';
+          ctx.fillText(songArtist, detailsX, detailsTop + 48);
 
           // Seekbar
-          const seekY = detailsTop + 75;
+          const seekY = detailsTop + 95;
           const seekWidth = detailsW;
           ctx.beginPath();
-          ctx.roundRect(detailsX, seekY, seekWidth, 10, 5);
+          ctx.roundRect(detailsX, seekY, seekWidth, 8, 4);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
           ctx.fill();
           const progressPercent = durationSeconds > 0 ? (currentTime / durationSeconds) : 0;
           ctx.beginPath();
-          ctx.roundRect(detailsX, seekY, seekWidth * progressPercent, 10, 5);
+          ctx.roundRect(detailsX, seekY, seekWidth * progressPercent, 8, 4);
           ctx.fillStyle = '#ffffff';
           ctx.fill();
 
           // Time labels
           ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.font = '500 16px Inter';
+          ctx.font = '500 18px Inter';
           ctx.textAlign = 'left';
-          ctx.fillText(formatTime(currentTime), detailsX, seekY + 38);
+          ctx.fillText(formatTime(currentTime), detailsX, seekY + 34);
           ctx.textAlign = 'right';
-          ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, detailsX + seekWidth, seekY + 38);
+          ctx.fillText(`-${formatTime(Math.max(0, durationSeconds - currentTime))}`, detailsX + seekWidth, seekY + 34);
 
-          // Controls
-          const ctrlY = seekY + 80;
+          // Controls (Centered backward, play/pause, forward)
+          const ctrlY = seekY + 84;
           const btnCenter = detailsX + detailsW / 2;
-
-          // Star
-          ctx.save();
-          ctx.translate(btnCenter - 160, ctrlY);
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-          ctx.lineWidth = 2.2;
-          ctx.lineJoin = 'round';
-          ctx.lineCap = 'round';
-          ctx.beginPath();
-          const spikes = 5;
-          const outerRadius = 18;
-          const innerRadius = 8;
-          let rot = Math.PI / 2 * 3;
-          const step = Math.PI / spikes;
-          ctx.moveTo(0, -outerRadius);
-          for (let i = 0; i < spikes; i++) {
-            ctx.lineTo(Math.cos(rot) * outerRadius, Math.sin(rot) * outerRadius);
-            rot += step;
-            ctx.lineTo(Math.cos(rot) * innerRadius, Math.sin(rot) * innerRadius);
-            rot += step;
-          }
-          ctx.closePath();
-          ctx.stroke();
-          ctx.restore();
 
           // Skip back
           ctx.save();
@@ -1530,49 +1476,47 @@ function App() {
           ctx.fill(); ctx.stroke();
           ctx.restore();
 
-          // Volume bar
-          const volY = ctrlY + 65;
-          const volX = detailsX + 40;
-          const volWidth = detailsW - 80;
+          // Bottom volume slider & device pill row (all on the same horizontal line)
+          const volY = ctrlY + 68;
 
+          // Calculate pill size first to position volume slider correctly
+          ctx.font = '600 20px Inter';
+          const textW = ctx.measureText(deviceName).width;
+          const pillH = 46;
+          const pillW = 26 + 18 + 10 + textW + 26;
+          const pillX = detailsX + detailsW - pillW;
+          const pillY = volY - 23; // centered vertically with slider center
+
+          // 1. Volume Icon (Low) on the left
           ctx.save();
           ctx.globalAlpha = 0.8;
           if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 28, volY - 5, 17, 18.4);
+            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, detailsX, volY - 10, 19, 20);
           }
           ctx.restore();
 
+          // 2. Volume track in the middle (between speaker icon and device pill)
+          const volX = detailsX + 32;
+          const volWidth = detailsW - 32 - pillW - 20;
+
           ctx.beginPath();
-          ctx.roundRect(volX, volY, volWidth, 8, 4);
+          ctx.roundRect(volX, volY - 4, volWidth, 8, 4);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
           ctx.fill();
           ctx.beginPath();
-          ctx.roundRect(volX, volY, volWidth * volume, 8, 4);
+          ctx.roundRect(volX, volY - 4, volWidth * volume, 8, 4);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
           ctx.fill();
 
-          ctx.save();
-          ctx.globalAlpha = 0.45;
-          if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 5, 24.4, 18.4);
-          }
-          ctx.restore();
-
-          // Device pill
-          ctx.font = '600 18px Inter';
-          const textW = ctx.measureText(deviceName).width;
-          const pillY = volY + 38;
-          const pillW = 26 + 18 + 10 + textW + 26;
-          const pillH = 42;
-          const pillX = btnCenter - pillW / 2;
+          // 3. Device Pill on the right
           ctx.beginPath();
-          ctx.roundRect(pillX, pillY, pillW, pillH, 21);
+          ctx.roundRect(pillX, pillY, pillW, pillH, 23);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.12)';
           ctx.fill();
 
           if (airplayImgRef.current && airplayImgRef.current.complete) {
             ctx.save();
-            ctx.translate(pillX + 26 + 9, pillY + 21);
+            ctx.translate(pillX + 26 + 9, pillY + 23);
             ctx.scale(0.9, 0.9);
             ctx.globalAlpha = 1.0;
             const img = airplayImgRef.current;
@@ -1582,10 +1526,10 @@ function App() {
           }
 
           ctx.fillStyle = '#ffffff';
-          ctx.font = '600 18px Inter';
+          ctx.font = '600 20px Inter';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(deviceName, pillX + 52, pillY + 21);
+          ctx.fillText(deviceName, pillX + 52, pillY + 23);
 
           ctx.restore(); // Restore scaled coordinates
 
