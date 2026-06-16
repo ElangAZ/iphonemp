@@ -138,7 +138,7 @@ video.bg-artwork-overlay.bg-cover-video {
 
 /* Artwork area */
 .artwork-section {
-  padding: 24px 24px 12px 24px;
+  padding: 24px 24px 20px 24px;
   position: relative;
 }
 
@@ -232,7 +232,7 @@ video.bg-artwork-overlay.bg-cover-video {
 
 /* Song info */
 .song-info {
-  padding: 10px 24px 12px 24px;
+  padding: 16px 24px 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -302,8 +302,8 @@ video.bg-artwork-overlay.bg-cover-video {
 /* Progress bar */
 .progress-section {
   padding: 0 24px;
-  margin-top: 10px;
-  margin-bottom: 2px;
+  margin-top: 16px;
+  margin-bottom: 4px;
 }
 
 .progress-track {
@@ -356,7 +356,7 @@ video.bg-artwork-overlay.bg-cover-video {
 
 /* Controls */
 .controls {
-  padding: 8px 24px;
+  padding: 14px 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -433,7 +433,7 @@ video.bg-artwork-overlay.bg-cover-video {
 
 /* Volume section styling */
 .volume-section {
-  padding: 6px 24px 12px 24px;
+  padding: 10px 24px 16px 24px;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -479,8 +479,8 @@ video.bg-artwork-overlay.bg-cover-video {
   display: flex;
   justify-content: center;
   align-items: center;
-  padding-bottom: 20px;
-  margin-top: 2px;
+  padding-bottom: 28px;
+  margin-top: 4px;
 }
 
 .device-pill {
