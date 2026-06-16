@@ -1410,6 +1410,35 @@ function App() {
           ctx.font = '500 22px Inter';
           ctx.fillText(songArtist, detailsX, detailsTop + 48);
 
+          // Spectrum (right-aligned with the artist line)
+          const specBarCount = 6;
+          const specGap = 3;
+          const specHeight = 36;
+          const specBarWidth = 2.5;
+          const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
+          const specX = detailsX + detailsW - specTotalWidth;
+          const specCenterY = detailsTop + 42; // Aligned near the artist name
+          for (let i = 0; i < specBarCount; i++) {
+            let val = 0;
+            if (i === 0) { val = (magnitudes[0] + magnitudes[1]) / 2; }
+            else { const freqBins = [20, 36, 56, 80, 110]; val = magnitudes[freqBins[i - 1] || 20] || 0; }
+            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+            const targetHeight = normalized * (specHeight / 2);
+            const decayRate = 0.75;
+            if (targetHeight > videoSmoothHeights[i]) { videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0; }
+            else { videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate; }
+            const halfH = Math.max(1.5, videoSmoothHeights[i]);
+            const bx = specX + i * (specBarWidth + specGap);
+            ctx.beginPath();
+            ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+            ctx.beginPath();
+            ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fill();
+          }
+
           // Seekbar
           const seekY = detailsTop + 95;
           const seekWidth = detailsW;
@@ -1434,6 +1463,30 @@ function App() {
           // Controls (Centered backward, play/pause, forward)
           const ctrlY = seekY + 84;
           const btnCenter = detailsX + detailsW / 2;
+
+          // Star Icon on the far left of the controls row
+          ctx.save();
+          ctx.translate(detailsX + 20, ctrlY);
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+          ctx.lineWidth = 2.2;
+          ctx.lineJoin = 'round';
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          const spikes = 5;
+          const outerRadius = 16;
+          const innerRadius = 7;
+          let rot = Math.PI / 2 * 3;
+          const step = Math.PI / spikes;
+          ctx.moveTo(0, -outerRadius);
+          for (let i = 0; i < spikes; i++) {
+            ctx.lineTo(Math.cos(rot) * outerRadius, Math.sin(rot) * outerRadius);
+            rot += step;
+            ctx.lineTo(Math.cos(rot) * innerRadius, Math.sin(rot) * innerRadius);
+            rot += step;
+          }
+          ctx.closePath();
+          ctx.stroke();
+          ctx.restore();
 
           // Skip back
           ctx.save();
