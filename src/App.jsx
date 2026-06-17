@@ -1124,22 +1124,19 @@ function App() {
         coverImgObj.src = captureCanvas.toDataURL('image/jpeg', 0.8);
         await new Promise(r => { coverImgObj.onload = r; if (coverImgObj.complete) r(); });
 
-        // Create dedicated video element — play it live to avoid per-frame seek flicker
+        // Dedicated video element for offline rendering
         coverVidEl = document.createElement('video');
         coverVidEl.src = artworkUrl;
         coverVidEl.muted = true;
         coverVidEl.playsInline = true;
-        coverVidEl.loop = true;
         coverVidEl.preload = 'auto';
         await new Promise(r => {
           coverVidEl.onloadeddata = r;
           coverVidEl.onerror = r;
           coverVidEl.load();
         });
-        // Start video playing from the beginning so frames are available
         coverVidEl.currentTime = 0;
         await new Promise(r => { coverVidEl.onseeked = r; setTimeout(r, 100); });
-        coverVidEl.play().catch(() => {});
       } else {
         const domImg = document.querySelector('.artwork-img');
         if (domImg && domImg.src && domImg.naturalWidth > 0) {
@@ -1272,6 +1269,19 @@ function App() {
         if (!isRecordingRef.current) {
           // Cancelled mid-process
           return;
+        }
+
+        if (coverVidEl) {
+          // Synchronize cover video time to the output timeline (currentTime - start)
+          // Loop a short segment of 3 seconds to create a "Live Photo" loop effect
+          const loopDuration = Math.min(3.0, coverVidEl.duration || 3.0);
+          const videoTime = (currentTime - start) % loopDuration;
+          coverVidEl.currentTime = videoTime;
+          await new Promise(r => {
+            coverVidEl.onseeked = r;
+            // Fallback timeout in case seeked doesn't fire
+            setTimeout(r, 20); 
+          });
         }
 
         const rawMagnitudes = getFFTDataAtTime(decodedBuffer, currentTime);
