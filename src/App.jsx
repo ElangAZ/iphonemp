@@ -1274,11 +1274,13 @@ function App() {
 
         if (coverVidEl) {
           // Synchronize cover video time to the output timeline (currentTime - start)
-          // Loop a short segment of 3 seconds if Live Photo is enabled, otherwise loop full duration
-          const loopDuration = isLivePhotoEnabled 
-            ? Math.min(3.0, coverVidEl.duration || 3.0)
-            : (coverVidEl.duration || 1.0);
-          const videoTime = (currentTime - start) % loopDuration;
+          let videoTime = 0;
+          if (isLivePhotoEnabled) {
+            const cycleTime = (currentTime - start) % 5.0;
+            videoTime = cycleTime % (coverVidEl.duration || 5.0);
+          } else {
+            videoTime = (currentTime - start) % (coverVidEl.duration || 1.0);
+          }
           coverVidEl.currentTime = videoTime;
           await new Promise(r => {
             coverVidEl.onseeked = r;
@@ -1350,8 +1352,17 @@ function App() {
           const artRadius = 23;
 
           const elapsed = currentTime - start;
-          const freezeTime = 3.0;
-          const fadeDur = 1.0;
+          let imgAlpha = 0.0;
+          if (isLivePhotoEnabled) {
+            const cycleTime = elapsed % 5.0;
+            if (cycleTime >= 3.0 && cycleTime < 3.5) {
+              imgAlpha = (cycleTime - 3.0) / 0.5;
+            } else if (cycleTime >= 3.5 && cycleTime < 4.5) {
+              imgAlpha = 1.0;
+            } else if (cycleTime >= 4.5 && cycleTime < 5.0) {
+              imgAlpha = (5.0 - cycleTime) / 0.5;
+            }
+          }
 
           if (coverVidEl && coverVidEl.readyState >= 2) {
             ctx.save();
@@ -1366,11 +1377,10 @@ function App() {
             else { sh = cvw; sy = (cvh - sh) / 2; }
             ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
 
-            // If Live Photo is enabled, fade in the static photo on top after 3 seconds
-            if (isLivePhotoEnabled && elapsed >= freezeTime) {
-              const alpha = Math.min(1.0, (elapsed - freezeTime) / fadeDur);
+            // Draw the static cover image over it with the computed alpha
+            if (imgAlpha > 0) {
               ctx.save();
-              ctx.globalAlpha = alpha;
+              ctx.globalAlpha = imgAlpha;
               if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
                 const imgRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
                 let isx = 0, isy = 0, isw = coverImgObj.naturalWidth, ish = coverImgObj.naturalHeight;
@@ -1660,8 +1670,17 @@ function App() {
           const artRadius = 20;
 
           const elapsed = currentTime - start;
-          const freezeTime = 3.0;
-          const fadeDur = 1.0;
+          let imgAlpha = 0.0;
+          if (isLivePhotoEnabled) {
+            const cycleTime = elapsed % 5.0;
+            if (cycleTime >= 3.0 && cycleTime < 3.5) {
+              imgAlpha = (cycleTime - 3.0) / 0.5;
+            } else if (cycleTime >= 3.5 && cycleTime < 4.5) {
+              imgAlpha = 1.0;
+            } else if (cycleTime >= 4.5 && cycleTime < 5.0) {
+              imgAlpha = (5.0 - cycleTime) / 0.5;
+            }
+          }
 
           if (coverVidEl && coverVidEl.readyState >= 2) {
             ctx.save();
@@ -1676,11 +1695,10 @@ function App() {
             else { sh = vw; sy = (vh - sh) / 2; }
             ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
 
-            // If Live Photo is enabled, fade in the static photo on top after 3 seconds
-            if (isLivePhotoEnabled && elapsed >= freezeTime) {
-              const alpha = Math.min(1.0, (elapsed - freezeTime) / fadeDur);
+            // Draw the static cover image over it with the computed alpha
+            if (imgAlpha > 0) {
               ctx.save();
-              ctx.globalAlpha = alpha;
+              ctx.globalAlpha = imgAlpha;
               if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
                 const imgRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
                 let isx = 0, isy = 0, isw = coverImgObj.naturalWidth, ish = coverImgObj.naturalHeight;
