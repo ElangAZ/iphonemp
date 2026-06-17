@@ -1349,6 +1349,10 @@ function App() {
           const artY = cardY + artPad;
           const artRadius = 23;
 
+          const elapsed = currentTime - start;
+          const freezeTime = 3.0;
+          const fadeDur = 1.0;
+
           if (coverVidEl && coverVidEl.readyState >= 2) {
             ctx.save();
             ctx.beginPath();
@@ -1361,6 +1365,21 @@ function App() {
             if (mRatio > 1) { sw = cvh; sx = (cvw - sw) / 2; }
             else { sh = cvw; sy = (cvh - sh) / 2; }
             ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
+
+            // If Live Photo is enabled, fade in the static photo on top after 3 seconds
+            if (isLivePhotoEnabled && elapsed >= freezeTime) {
+              const alpha = Math.min(1.0, (elapsed - freezeTime) / fadeDur);
+              ctx.save();
+              ctx.globalAlpha = alpha;
+              if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+                const imgRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
+                let isx = 0, isy = 0, isw = coverImgObj.naturalWidth, ish = coverImgObj.naturalHeight;
+                if (imgRatio > 1) { isw = ish; isx = (coverImgObj.naturalWidth - isw) / 2; }
+                else { ish = isw; isy = (coverImgObj.naturalHeight - ish) / 2; }
+                ctx.drawImage(coverImgObj, isx, isy, isw, ish, artX, artY, artSize, artSize);
+              }
+              ctx.restore();
+            }
             ctx.restore();
           } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
             ctx.save();
@@ -1640,6 +1659,10 @@ function App() {
           const artY = cardY + artPadding;
           const artRadius = 20;
 
+          const elapsed = currentTime - start;
+          const freezeTime = 3.0;
+          const fadeDur = 1.0;
+
           if (coverVidEl && coverVidEl.readyState >= 2) {
             ctx.save();
             ctx.beginPath();
@@ -1652,6 +1675,21 @@ function App() {
             if (mRatio > 1) { sw = vh; sx = (vw - sw) / 2; }
             else { sh = vw; sy = (vh - sh) / 2; }
             ctx.drawImage(coverVidEl, sx, sy, sw, sh, artX, artY, artSize, artSize);
+
+            // If Live Photo is enabled, fade in the static photo on top after 3 seconds
+            if (isLivePhotoEnabled && elapsed >= freezeTime) {
+              const alpha = Math.min(1.0, (elapsed - freezeTime) / fadeDur);
+              ctx.save();
+              ctx.globalAlpha = alpha;
+              if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
+                const imgRatio = coverImgObj.naturalWidth / coverImgObj.naturalHeight;
+                let isx = 0, isy = 0, isw = coverImgObj.naturalWidth, ish = coverImgObj.naturalHeight;
+                if (imgRatio > 1) { isw = ish; isx = (coverImgObj.naturalWidth - isw) / 2; }
+                else { ish = isw; isy = (coverImgObj.naturalHeight - ish) / 2; }
+                ctx.drawImage(coverImgObj, isx, isy, isw, ish, artX, artY, artSize, artSize);
+              }
+              ctx.restore();
+            }
             ctx.restore();
           } else if (coverImgObj && coverImgObj.complete && coverImgObj.naturalWidth !== 0) {
             ctx.save();
