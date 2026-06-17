@@ -58,6 +58,7 @@ function App() {
   const [landscapeArtPadding, setLandscapeArtPadding] = useState(26);
   const [landscapeDetailsGap, setLandscapeDetailsGap] = useState(32);
   const [landscapeBottomOffset, setLandscapeBottomOffset] = useState(0);
+  const [isLivePhotoEnabled, setIsLivePhotoEnabled] = useState(true);
 
   // Initialize with a beautiful default audio waveform pattern (Intro, Verse, Build, Drop, Outro)
   const [waveformPeaks, setWaveformPeaks] = useState(() => {
@@ -1273,8 +1274,10 @@ function App() {
 
         if (coverVidEl) {
           // Synchronize cover video time to the output timeline (currentTime - start)
-          // Loop a short segment of 3 seconds to create a "Live Photo" loop effect
-          const loopDuration = Math.min(3.0, coverVidEl.duration || 3.0);
+          // Loop a short segment of 3 seconds if Live Photo is enabled, otherwise loop full duration
+          const loopDuration = isLivePhotoEnabled 
+            ? Math.min(3.0, coverVidEl.duration || 3.0)
+            : (coverVidEl.duration || 1.0);
           const videoTime = (currentTime - start) % loopDuration;
           coverVidEl.currentTime = videoTime;
           await new Promise(r => {
@@ -3032,6 +3035,22 @@ function App() {
                         </div>
                       )}
                     </div>
+
+                    {isCoverVideo && (
+                      <div className="editor-fade-section" style={{ marginTop: '12px' }}>
+                        <div className="editor-fade-toggle">
+                          <span className="editor-setting-label">LIVE PHOTO LOOP (3 DETIK)</span>
+                          <label className="editor-switch">
+                            <input 
+                              type="checkbox" 
+                              checked={isLivePhotoEnabled} 
+                              onChange={(e) => setIsLivePhotoEnabled(e.target.checked)} 
+                            />
+                            <span className="editor-switch-slider"></span>
+                          </label>
+                        </div>
+                      </div>
+                    )}
 
                     {renderAspectRatio === '16:9' && (
                       <div className="editor-fade-section" style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
