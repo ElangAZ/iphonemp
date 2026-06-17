@@ -116,8 +116,7 @@ video.bg-artwork-overlay.bg-cover-video {
   -webkit-backdrop-filter: blur(60px) saturate(1.0) brightness(0.85);
   border-radius: 55px;
   border: 2px solid rgba(255, 255, 255, 0.15);
-  box-shadow:
-    0 60px 120px rgba(0, 0, 0, 0.90);
+  box-shadow: none;
   padding: 0;
   overflow: hidden;
   position: relative;
