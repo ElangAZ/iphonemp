@@ -1363,7 +1363,10 @@ function App() {
         }
       };
 
-      let muxer = new Muxer({
+      let audioEncoder = null;
+      const hasAudioEncoder = !window.Capacitor && typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
+
+      let muxerOpts = {
         target: new StreamTarget({
           onData: (data, position) => {
             writeData(data, position);
@@ -1374,7 +1377,29 @@ function App() {
           width: canvas.width,
           height: canvas.height
         }
-      });
+      };
+
+      if (hasAudioEncoder) {
+        muxerOpts.audio = {
+          codec: 'A_OPUS',
+          numberOfChannels: decodedBuffer.numberOfChannels,
+          sampleRate: decodedBuffer.sampleRate
+        };
+
+        audioEncoder = new AudioEncoder({
+          output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
+          error: (e) => console.error("AudioEncoder error:", e)
+        });
+
+        audioEncoder.configure({
+          codec: 'opus',
+          numberOfChannels: decodedBuffer.numberOfChannels,
+          sampleRate: decodedBuffer.sampleRate,
+          bitrate: 128000
+        });
+      }
+
+      let muxer = new Muxer(muxerOpts);
 
       let encoder = new VideoEncoder({
         output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
@@ -2171,6 +2196,54 @@ function App() {
         encoder.encode(videoFrame, { keyFrame: frameIndex % 30 === 0 });
         videoFrame.close();
 
+        // Encode audio chunk on browser web version
+        if (audioEncoder && window.AudioData) {
+          try {
+            const sampleRate = decodedBuffer.sampleRate;
+            const numChannels = decodedBuffer.numberOfChannels;
+            const samplesToEncode = Math.floor(timeStep * sampleRate);
+            const startSample = Math.floor(currentTime * sampleRate);
+            
+            const planarBuffer = new Float32Array(samplesToEncode * numChannels);
+            
+            let targetVolume = volume;
+            if (isAudioFadeEnabledRef.current) {
+              const fadeDuration = parseFloat(audioFadeDurationRef.current) || 1.0;
+              const startSecs = start;
+              const limitSecs = end;
+              if (currentTime < startSecs + fadeDuration) {
+                targetVolume = volume * (Math.max(0, currentTime - startSecs) / fadeDuration);
+              } else if (currentTime > limitSecs - fadeDuration) {
+                targetVolume = volume * (Math.max(0, limitSecs - currentTime) / fadeDuration);
+              }
+            }
+
+            for (let channel = 0; channel < numChannels; channel++) {
+              const channelData = decodedBuffer.getChannelData(channel);
+              const offset = channel * samplesToEncode;
+              for (let s = 0; s < samplesToEncode; s++) {
+                const srcIdx = startSample + s;
+                let sampleVal = (srcIdx < channelData.length) ? channelData[srcIdx] : 0;
+                planarBuffer[offset + s] = sampleVal * targetVolume;
+              }
+            }
+
+            const audioData = new AudioData({
+              format: 'f32-planar',
+              sampleRate: sampleRate,
+              numberOfFrames: samplesToEncode,
+              numberOfChannels: numChannels,
+              timestamp: timestampUs,
+              data: planarBuffer
+            });
+
+            audioEncoder.encode(audioData);
+            audioData.close();
+          } catch (audioEncErr) {
+            console.error("Audio encoding error during frame:", audioEncErr);
+          }
+        }
+
         // Update progress
         const currentProgress = Math.min(100, Math.round((frameIndex / totalFrames) * 100));
         setRenderProgress(currentProgress);
@@ -2197,6 +2270,9 @@ function App() {
 
       setRenderError('Menyelesaikan encoding video WebM...');
       await encoder.flush();
+      if (audioEncoder) {
+        await audioEncoder.flush();
+      }
       muxer.finalize();
 
       if (window.Capacitor) {
