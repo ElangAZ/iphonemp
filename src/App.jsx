@@ -136,6 +136,11 @@ function App() {
   const videoSourceRef = useRef(null);
   const audioDestinationRef = useRef(null);
 
+  // Reuse FFT arrays to avoid thousands of allocations/GC pauses during rendering
+  const fftReRef = useRef(new Float32Array(512));
+  const fftImRef = useRef(new Float32Array(512));
+  const fftMagRef = useRef(new Uint8Array(256));
+
   // Automatically check if title overflows to trigger smooth marquee scrolling
   useEffect(() => {
     const checkMarquee = () => {
@@ -342,13 +347,78 @@ function App() {
     e.target.value = ''; // Reset input to allow selecting same file
   };
 
+  // Helper to extract embedded MP4 from Samsung/Google Motion Photo JPEG
+  const extractMotionPhotoVideo = async (file) => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const bytes = new Uint8Array(arrayBuffer);
+      let ftypIdx = -1;
+      for (let i = 0; i < bytes.length - 4; i++) {
+        if (bytes[i] === 0x66 && bytes[i+1] === 0x74 && bytes[i+2] === 0x79 && bytes[i+3] === 0x70) {
+          ftypIdx = i;
+          break;
+        }
+      }
+      if (ftypIdx !== -1) {
+        const videoStart = ftypIdx - 4;
+        if (videoStart >= 0) {
+          const videoBytes = bytes.subarray(videoStart);
+          return new Blob([videoBytes], { type: 'video/mp4' });
+        }
+      }
+    } catch (e) {
+      console.error("Error parsing motion photo:", e);
+    }
+    return null;
+  };
+
   // Custom Cover Image/Video uploader
-  const handleCoverUpload = (e) => {
+  const handleCoverUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
-    const isVid = file.type.startsWith('video/');
+    let uploadFile = file;
+    let isVid = file.type.startsWith('video/');
+
+    // Auto-detect Samsung/Google Motion Photo JPEG files and extract the embedded video
+    if (file.type === 'image/jpeg' || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg')) {
+      const motionVideoBlob = await extractMotionPhotoVideo(file);
+      if (motionVideoBlob) {
+        isVid = true;
+        uploadFile = new File([motionVideoBlob], file.name.replace(/\.[^/.]+$/, "") + ".mp4", { type: 'video/mp4' });
+        console.log("Motion Photo detected! Extracted embedded video.");
+      }
+    }
+
+    let url = URL.createObjectURL(uploadFile);
+
+    if (window.Capacitor) {
+      try {
+        const { Filesystem, Directory } = await import('@capacitor/filesystem');
+        const cacheDir = (Directory && Directory.Cache) ? Directory.Cache : 'CACHE';
+        const filename = `temp_cover_${Date.now()}.${uploadFile.name.split('.').pop()}`;
+
+        // Convert file to base64
+        const base64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result.split(',')[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(uploadFile);
+        });
+
+        const savedFile = await Filesystem.writeFile({
+          path: filename,
+          data: base64,
+          directory: cacheDir
+        });
+
+        const { Capacitor } = await import('@capacitor/core');
+        url = Capacitor.convertFileSrc(savedFile.uri);
+      } catch (err) {
+        console.error("Failed to save cover to native disk:", err);
+      }
+    }
+
     setIsCoverVideo(isVid);
     setArtworkUrl(url);
     setManualCoverSet(true);
@@ -519,8 +589,8 @@ function App() {
         ctx.save();
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = isRecordingRef.current ? 'low' : 'medium';
-        // Draw cached blur canvas stretched to fill, with slight overflow to prevent edge gaps
-        ctx.drawImage(cachedBgCanvas, -2, -2, canvasWidth + 4, canvasHeight + 4);
+        // Draw cached blur canvas stretched to fill, with substantial overflow to prevent edge gaps
+        ctx.drawImage(cachedBgCanvas, -30, -30, canvasWidth + 60, canvasHeight + 60);
         ctx.restore();
         
         // Add a premium subtle dark overlay
@@ -1048,8 +1118,8 @@ function App() {
     const sampleRate = audioBuffer.sampleRate;
     const startIndex = Math.floor(time * sampleRate);
     const fftSize = 512;
-    const re = new Float32Array(fftSize);
-    const im = new Float32Array(fftSize);
+    const re = fftReRef.current;
+    const im = fftImRef.current;
     
     let channelData;
     if (audioBuffer.numberOfChannels > 0) {
@@ -1071,7 +1141,7 @@ function App() {
 
     simpleFFT(re, im);
 
-    const magnitudes = new Uint8Array(fftSize / 2);
+    const magnitudes = fftMagRef.current;
     for (let i = 0; i < fftSize / 2; i++) {
       const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
       magnitudes[i] = Math.min(255, Math.floor(mag * 380));
@@ -1132,10 +1202,23 @@ function App() {
         coverVidEl.playsInline = true;
         coverVidEl.preload = 'auto';
         await new Promise(r => {
+          coverVidEl.onloadedmetadata = () => {
+            if (coverVidEl.duration && !isNaN(coverVidEl.duration)) {
+              r();
+            }
+          };
           coverVidEl.onloadeddata = r;
           coverVidEl.onerror = r;
           coverVidEl.load();
         });
+
+        // Wait up to 200ms to ensure duration is populated
+        let checkCount = 0;
+        while ((isNaN(coverVidEl.duration) || coverVidEl.duration === 0) && checkCount < 20) {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          checkCount++;
+        }
+
         coverVidEl.currentTime = 0;
         await new Promise(r => { coverVidEl.onseeked = r; setTimeout(r, 100); });
       } else {
@@ -1185,6 +1268,29 @@ function App() {
       }
       const ctx = canvas.getContext('2d');
 
+      // Initialize Capacitor Filesystem if running on mobile
+      const { Filesystem, Directory } = window.Capacitor 
+        ? await import('@capacitor/filesystem') 
+        : { Filesystem: null, Directory: null };
+      const cacheDir = (Directory && Directory.Cache) ? Directory.Cache : 'CACHE';
+      const videoFilename = 'temp_input.webm';
+      const audioFilename = 'temp_audio.wav';
+      let videoFileUri = '';
+
+      if (window.Capacitor) {
+        try { await Filesystem.deleteFile({ path: videoFilename, directory: cacheDir }); } catch (e) {}
+        try { await Filesystem.deleteFile({ path: audioFilename, directory: cacheDir }); } catch (e) {}
+
+        await Filesystem.writeFile({
+          path: videoFilename,
+          data: '',
+          directory: cacheDir,
+          recursive: true
+        });
+        const uriResult = await Filesystem.getUri({ path: videoFilename, directory: cacheDir });
+        videoFileUri = uriResult.uri;
+      }
+
       setRenderError('Mendecode audio untuk ekspor offline...');
       // 3. Decode audio buffer to PCM
       const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -1194,10 +1300,75 @@ function App() {
       setRenderError('Mengekspor video frame-demi-frame...');
       
       // 4. Set up Muxer and VideoEncoder
-      const { Muxer, ArrayBufferTarget } = await import('webm-muxer');
+      const { Muxer, StreamTarget } = await import('webm-muxer');
+
+      const pages = [];
+      const pageSize = 1024 * 1024; // 1MB pages
+      let fileLength = 0;
+      let nativeWritePromise = Promise.resolve();
+
+      const uint8ToBase64 = (u8) => {
+        let binary = '';
+        const len = u8.byteLength;
+        for (let i = 0; i < len; i++) {
+          binary += String.fromCharCode(u8[i]);
+        }
+        return window.btoa(binary);
+      };
+
+      const writeData = (data, position) => {
+        const end = position + data.length;
+        if (end > fileLength) {
+          fileLength = end;
+        }
+
+        if (window.Capacitor && videoFileUri) {
+          const dataToSave = data.slice(); // Copy to avoid reuse race conditions
+          nativeWritePromise = nativeWritePromise.then(async () => {
+            try {
+              const base64 = uint8ToBase64(dataToSave);
+              const { registerPlugin } = await import('@capacitor/core');
+              const VideoTranscoder = registerPlugin('VideoTranscoder');
+              await VideoTranscoder.writeChunk({
+                path: videoFileUri,
+                data: base64,
+                offset: position
+              });
+            } catch (err) {
+              console.error("Failed to write native chunk:", err);
+            }
+          });
+        } else {
+          let remaining = data.length;
+          let dataOffset = 0;
+          let writeOffset = position;
+
+          while (remaining > 0) {
+            const pageIndex = Math.floor(writeOffset / pageSize);
+            const pageStart = pageIndex * pageSize;
+            const offsetInPage = writeOffset - pageStart;
+            const bytesToPageEnd = pageSize - offsetInPage;
+            const bytesToWrite = Math.min(remaining, bytesToPageEnd);
+
+            if (!pages[pageIndex]) {
+              pages[pageIndex] = new Uint8Array(pageSize);
+            }
+
+            pages[pageIndex].set(data.subarray(dataOffset, dataOffset + bytesToWrite), offsetInPage);
+
+            remaining -= bytesToWrite;
+            dataOffset += bytesToWrite;
+            writeOffset += bytesToWrite;
+          }
+        }
+      };
 
       let muxer = new Muxer({
-        target: new ArrayBufferTarget(),
+        target: new StreamTarget({
+          onData: (data, position) => {
+            writeData(data, position);
+          }
+        }),
         video: {
           codec: 'V_VP9',
           width: canvas.width,
@@ -1306,7 +1477,8 @@ function App() {
           ctx.save();
           ctx.imageSmoothingEnabled = true;
           ctx.imageSmoothingQuality = 'low';
-          ctx.drawImage(cachedBgCanvas, -2, -2, canvas.width + 4, canvas.height + 4);
+          // Draw cached blur canvas stretched to fill, with substantial overflow to prevent edge gaps
+          ctx.drawImage(cachedBgCanvas, -30, -30, canvas.width + 60, canvas.height + 60);
           ctx.restore();
           ctx.fillStyle = 'rgba(10, 10, 20, 0.35)';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -2026,41 +2198,44 @@ function App() {
       setRenderError('Menyelesaikan encoding video WebM...');
       await encoder.flush();
       muxer.finalize();
-      const webmBuffer = muxer.target.buffer;
-      const recordedBlob = new Blob([webmBuffer], { type: 'video/webm' });
-      setRenderFileSize(recordedBlob.size);
+
+      if (window.Capacitor) {
+        setRenderError('Menunggu penulisan native video selesai...');
+        await nativeWritePromise;
+      }
+
+      let recordedBlob = null;
+      if (!window.Capacitor) {
+        // Reconstruct WebM recordedBlob from pages array using zero extra contiguous RAM
+        const webmBlobs = [];
+        let remainingBytes = fileLength;
+        let pageIdx = 0;
+        while (remainingBytes > 0) {
+          const bytesFromPage = Math.min(remainingBytes, pageSize);
+          if (pages[pageIdx]) {
+            webmBlobs.push(pages[pageIdx].subarray(0, bytesFromPage));
+          } else {
+            webmBlobs.push(new Uint8Array(bytesFromPage));
+          }
+          remainingBytes -= bytesFromPage;
+          pageIdx++;
+        }
+        recordedBlob = new Blob(webmBlobs, { type: 'video/webm' });
+        setRenderFileSize(recordedBlob.size);
+      } else {
+        setRenderFileSize(fileLength);
+      }
 
       // Now merge/transcode
       if (window.Capacitor) {
         setRenderPhase('converting');
-        setConvertProgress(10);
+        setConvertProgress(40); // Immediately 40% since video file is already written
         
         const { Filesystem, Directory } = await import('@capacitor/filesystem');
         const cacheDir = (Directory && Directory.Cache) ? Directory.Cache : 'CACHE';
         
         const videoFilename = 'temp_input.webm';
         const audioFilename = 'temp_audio.wav';
-
-        // Clean up
-        try { await Filesystem.deleteFile({ path: videoFilename, directory: cacheDir }); } catch (e) {}
-        try { await Filesystem.deleteFile({ path: audioFilename, directory: cacheDir }); } catch (e) {}
-
-        // Write silent WebM
-        setRenderError('Menyalin video ke penyimpanan native...');
-        const webmBlob = new Blob([webmBuffer], { type: 'video/webm' });
-        const videoBase64 = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result.split(',')[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(webmBlob);
-        });
-        await Filesystem.writeFile({
-          path: videoFilename,
-          data: videoBase64,
-          directory: cacheDir,
-          recursive: true
-        });
-        setConvertProgress(40);
 
         // Render the faded, clipped WAV audio in Javascript
         setRenderError('Memproses efek volume fade in/out...');
@@ -2073,16 +2248,44 @@ function App() {
           parseFloat(audioFadeDuration) || 1.0
         );
         const wavBuffer = bufferToWav(fadedAudioBuffer);
-        const audioBase64 = await arrayBufferToBase64(wavBuffer);
 
-        // Write processed WAV audio to native filesystem
+        // Write processed WAV audio to native filesystem incrementally in chunks
         setRenderError('Menyimpan audio hasil pemrosesan...');
-        await Filesystem.writeFile({
-          path: audioFilename,
-          data: audioBase64,
-          directory: cacheDir,
-          recursive: true
-        });
+        const writeChunkSize = 2 * 1024 * 1024; // 2MB
+        const wavBytes = new Uint8Array(wavBuffer);
+        let writtenAudioBytes = 0;
+        let isFirstAudioWrite = true;
+
+        while (writtenAudioBytes < wavBytes.length) {
+          const sizeToWrite = Math.min(wavBytes.length - writtenAudioBytes, writeChunkSize);
+          const chunkSlice = wavBytes.subarray(writtenAudioBytes, writtenAudioBytes + sizeToWrite);
+          
+          const chunkBlob = new Blob([chunkSlice]);
+          const chunkBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result.split(',')[1]);
+            reader.onerror = reject;
+            reader.readAsDataURL(chunkBlob);
+          });
+
+          if (isFirstAudioWrite) {
+            await Filesystem.writeFile({
+              path: audioFilename,
+              data: chunkBase64,
+              directory: cacheDir,
+              recursive: true
+            });
+            isFirstAudioWrite = false;
+          } else {
+            await Filesystem.appendFile({
+              path: audioFilename,
+              data: chunkBase64,
+              directory: cacheDir
+            });
+          }
+
+          writtenAudioBytes += sizeToWrite;
+        }
         setConvertProgress(70);
 
         const videoUriResult = await Filesystem.getUri({ path: videoFilename, directory: cacheDir });

@@ -197,4 +197,38 @@ public class VideoTranscoderPlugin extends Plugin {
             call.reject("Failed to save to downloads: " + e.getMessage(), e);
         }
     }
+
+    @PluginMethod
+    public void writeChunk(PluginCall call) {
+        String path = call.getString("path");
+        String base64Data = call.getString("data");
+        Double offsetDouble = call.getDouble("offset", 0.0);
+        long offset = offsetDouble != null ? offsetDouble.longValue() : 0L;
+
+        if (path == null || base64Data == null) {
+            call.reject("Path or data is null");
+            return;
+        }
+
+        try {
+            File file = path.startsWith("file://") ? new File(Uri.parse(path).getPath()) : new File(path);
+            File parentDir = file.getParentFile();
+            if (parentDir != null && !parentDir.exists()) {
+                parentDir.mkdirs();
+            }
+
+            byte[] data = android.util.Base64.decode(base64Data, android.util.Base64.DEFAULT);
+
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(file, "rw")) {
+                raf.seek(offset);
+                raf.write(data);
+            }
+
+            JSObject ret = new JSObject();
+            ret.put("success", true);
+            call.resolve(ret);
+        } catch (Exception e) {
+            call.reject("Failed to write chunk: " + e.getMessage(), e);
+        }
+    }
 }
