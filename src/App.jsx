@@ -1364,15 +1364,25 @@ function App() {
       };
 
       let useMp4 = false;
-      if (!window.Capacitor && typeof VideoEncoder !== 'undefined') {
+      let hasAudioEncoder = false;
+      if (!window.Capacitor && typeof VideoEncoder !== 'undefined' && typeof AudioEncoder !== 'undefined') {
         try {
-          const videoSupport = await VideoEncoder.isConfiguredSupported({
+          const videoSupport = await VideoEncoder.isConfigSupported({
             codec: 'avc1.4d002a', // H.264 Main Profile
             width: canvas.width,
             height: canvas.height,
             bitrate: parseInt(renderBitrate, 10) * 1000
           });
-          useMp4 = videoSupport.supported;
+          
+          const audioSupport = await AudioEncoder.isConfigSupported({
+            codec: 'mp4a.40.2', // AAC-LC
+            numberOfChannels: decodedBuffer.numberOfChannels,
+            sampleRate: decodedBuffer.sampleRate,
+            bitrate: 128000
+          });
+
+          useMp4 = videoSupport.supported && audioSupport.supported;
+          hasAudioEncoder = audioSupport.supported;
         } catch (e) {
           console.warn("MP4 check failed:", e);
         }
@@ -1380,7 +1390,6 @@ function App() {
 
       let muxer;
       let audioEncoder = null;
-      const hasAudioEncoder = typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
 
       if (useMp4) {
         const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
@@ -1430,7 +1439,8 @@ function App() {
           }
         };
 
-        if (hasAudioEncoder && !window.Capacitor) {
+        const webHasAudioEncoder = !window.Capacitor && typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
+        if (webHasAudioEncoder) {
           muxerOpts.audio = {
             codec: 'A_OPUS',
             numberOfChannels: decodedBuffer.numberOfChannels,
@@ -1462,12 +1472,16 @@ function App() {
       });
 
       const fps = parseInt(renderFps, 10);
-      encoder.configure({
+      const encoderConfig = {
         codec: useMp4 ? 'avc1.4d002a' : 'vp09.00.10.08',
         width: canvas.width,
         height: canvas.height,
         bitrate: parseInt(renderBitrate, 10) * 1000
-      });
+      };
+      if (useMp4) {
+        encoderConfig.avc = { format: 'avc' }; // Crucial: output AVCC (not Annex B) for MP4/Windows compatibility
+      }
+      encoder.configure(encoderConfig);
 
       // Prepare drawing resources once
       let bgFallbackColor = '#0a0a14';
