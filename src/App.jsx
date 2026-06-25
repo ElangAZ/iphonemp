@@ -1363,43 +1363,95 @@ function App() {
         }
       };
 
-      let audioEncoder = null;
-      const hasAudioEncoder = !window.Capacitor && typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
-
-      let muxerOpts = {
-        target: new StreamTarget({
-          onData: (data, position) => {
-            writeData(data, position);
-          }
-        }),
-        video: {
-          codec: 'V_VP9',
-          width: canvas.width,
-          height: canvas.height
+      let useMp4 = false;
+      if (!window.Capacitor && typeof VideoEncoder !== 'undefined') {
+        try {
+          const videoSupport = await VideoEncoder.isConfiguredSupported({
+            codec: 'avc1.4d002a', // H.264 Main Profile
+            width: canvas.width,
+            height: canvas.height,
+            bitrate: parseInt(renderBitrate, 10) * 1000
+          });
+          useMp4 = videoSupport.supported;
+        } catch (e) {
+          console.warn("MP4 check failed:", e);
         }
-      };
-
-      if (hasAudioEncoder) {
-        muxerOpts.audio = {
-          codec: 'A_OPUS',
-          numberOfChannels: decodedBuffer.numberOfChannels,
-          sampleRate: decodedBuffer.sampleRate
-        };
-
-        audioEncoder = new AudioEncoder({
-          output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
-          error: (e) => console.error("AudioEncoder error:", e)
-        });
-
-        audioEncoder.configure({
-          codec: 'opus',
-          numberOfChannels: decodedBuffer.numberOfChannels,
-          sampleRate: decodedBuffer.sampleRate,
-          bitrate: 128000
-        });
       }
 
-      let muxer = new Muxer(muxerOpts);
+      let muxer;
+      let audioEncoder = null;
+      const hasAudioEncoder = typeof window.AudioEncoder !== 'undefined' && typeof window.AudioData !== 'undefined';
+
+      if (useMp4) {
+        const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
+        let muxerOpts = {
+          target: new ArrayBufferTarget(),
+          video: {
+            codec: 'avc',
+            width: canvas.width,
+            height: canvas.height
+          },
+          fastStart: 'in-memory'
+        };
+
+        if (hasAudioEncoder) {
+          muxerOpts.audio = {
+            codec: 'aac',
+            numberOfChannels: decodedBuffer.numberOfChannels,
+            sampleRate: decodedBuffer.sampleRate
+          };
+
+          audioEncoder = new AudioEncoder({
+            output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
+            error: (e) => console.error("AudioEncoder error:", e)
+          });
+
+          audioEncoder.configure({
+            codec: 'mp4a.40.2', // AAC-LC
+            numberOfChannels: decodedBuffer.numberOfChannels,
+            sampleRate: decodedBuffer.sampleRate,
+            bitrate: 128000
+          });
+        }
+
+        muxer = new Muxer(muxerOpts);
+      } else {
+        const { Muxer, StreamTarget } = await import('webm-muxer');
+        let muxerOpts = {
+          target: new StreamTarget({
+            onData: (data, position) => {
+              writeData(data, position);
+            }
+          }),
+          video: {
+            codec: 'V_VP9',
+            width: canvas.width,
+            height: canvas.height
+          }
+        };
+
+        if (hasAudioEncoder && !window.Capacitor) {
+          muxerOpts.audio = {
+            codec: 'A_OPUS',
+            numberOfChannels: decodedBuffer.numberOfChannels,
+            sampleRate: decodedBuffer.sampleRate
+          };
+
+          audioEncoder = new AudioEncoder({
+            output: (chunk, metadata) => muxer.addAudioChunk(chunk, metadata),
+            error: (e) => console.error("AudioEncoder error:", e)
+          });
+
+          audioEncoder.configure({
+            codec: 'opus',
+            numberOfChannels: decodedBuffer.numberOfChannels,
+            sampleRate: decodedBuffer.sampleRate,
+            bitrate: 128000
+          });
+        }
+
+        muxer = new Muxer(muxerOpts);
+      }
 
       let encoder = new VideoEncoder({
         output: (chunk, metadata) => muxer.addVideoChunk(chunk, metadata),
@@ -1411,7 +1463,7 @@ function App() {
 
       const fps = parseInt(renderFps, 10);
       encoder.configure({
-        codec: 'vp09.00.10.08',
+        codec: useMp4 ? 'avc1.4d002a' : 'vp09.00.10.08',
         width: canvas.width,
         height: canvas.height,
         bitrate: parseInt(renderBitrate, 10) * 1000
@@ -2268,7 +2320,7 @@ function App() {
         }
       }
 
-      setRenderError('Menyelesaikan encoding video WebM...');
+      setRenderError('Menyelesaikan encoding video...');
       await encoder.flush();
       if (audioEncoder) {
         await audioEncoder.flush();
@@ -2282,22 +2334,28 @@ function App() {
 
       let recordedBlob = null;
       if (!window.Capacitor) {
-        // Reconstruct WebM recordedBlob from pages array using zero extra contiguous RAM
-        const webmBlobs = [];
-        let remainingBytes = fileLength;
-        let pageIdx = 0;
-        while (remainingBytes > 0) {
-          const bytesFromPage = Math.min(remainingBytes, pageSize);
-          if (pages[pageIdx]) {
-            webmBlobs.push(pages[pageIdx].subarray(0, bytesFromPage));
-          } else {
-            webmBlobs.push(new Uint8Array(bytesFromPage));
+        if (useMp4) {
+          const { buffer } = muxer.target;
+          recordedBlob = new Blob([buffer], { type: 'video/mp4' });
+          setRenderFileSize(recordedBlob.size);
+        } else {
+          // Reconstruct WebM recordedBlob from pages array using zero extra contiguous RAM
+          const webmBlobs = [];
+          let remainingBytes = fileLength;
+          let pageIdx = 0;
+          while (remainingBytes > 0) {
+            const bytesFromPage = Math.min(remainingBytes, pageSize);
+            if (pages[pageIdx]) {
+              webmBlobs.push(pages[pageIdx].subarray(0, bytesFromPage));
+            } else {
+              webmBlobs.push(new Uint8Array(bytesFromPage));
+            }
+            remainingBytes -= bytesFromPage;
+            pageIdx++;
           }
-          remainingBytes -= bytesFromPage;
-          pageIdx++;
+          recordedBlob = new Blob(webmBlobs, { type: 'video/webm' });
+          setRenderFileSize(recordedBlob.size);
         }
-        recordedBlob = new Blob(webmBlobs, { type: 'video/webm' });
-        setRenderFileSize(recordedBlob.size);
       } else {
         setRenderFileSize(fileLength);
       }
