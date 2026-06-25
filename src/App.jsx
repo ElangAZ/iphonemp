@@ -494,9 +494,9 @@ function App() {
       cachedBgCtx.imageSmoothingEnabled = true;
       cachedBgCtx.imageSmoothingQuality = 'high';
       cachedBgCtx.save();
-      cachedBgCtx.filter = 'blur(20px) saturate(1.7) brightness(1.05)';
-      // Draw with 40px overflow on all sides to prevent edge bleeding
-      cachedBgCtx.drawImage(coverImgObj, -40, -40, 440, 720);
+      cachedBgCtx.filter = 'blur(80px) saturate(1.7) brightness(1.05)';
+      // Draw with 160px overflow on all sides to prevent edge bleeding
+      cachedBgCtx.drawImage(coverImgObj, -160, -160, 680, 960);
       cachedBgCtx.restore();
     }
 
@@ -1506,8 +1506,8 @@ function App() {
         cachedBgCtx.imageSmoothingEnabled = true;
         cachedBgCtx.imageSmoothingQuality = 'low';
         cachedBgCtx.save();
-        cachedBgCtx.filter = 'blur(20px) saturate(1.7) brightness(1.05)';
-        cachedBgCtx.drawImage(coverImgObj, -40, -40, 440, 720);
+        cachedBgCtx.filter = 'blur(80px) saturate(1.7) brightness(1.05)';
+        cachedBgCtx.drawImage(coverImgObj, -160, -160, 680, 960);
         cachedBgCtx.restore();
       }
 
@@ -3281,7 +3281,7 @@ function App() {
                           className="editor-preview-bg"
                           src={artworkUrl}
                           autoPlay loop muted playsInline
-                          style={{ objectFit: 'cover', filter: 'blur(20px) saturate(1.7) brightness(0.5)', transform: 'scale(1.3)', position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
+                          style={{ objectFit: 'cover', filter: 'blur(80px) saturate(1.7) brightness(0.5)', transform: 'scale(1.5)', position: 'absolute', inset: 0, width: '100%', height: '100%', zIndex: 0 }}
                         />
                       )}
 
