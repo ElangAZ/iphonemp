@@ -944,9 +944,9 @@ function App() {
       
       // Left low-volume speaker icon
       ctx.save();
-      ctx.globalAlpha = 1.0;
+      ctx.globalAlpha = 0.95;
       if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-        ctx.drawImage(volumeLowImgRef.current, 0, 0, 1024, 1024, volX - 36, volY - 7, 24, 24);
+        ctx.drawImage(volumeLowImgRef.current, 100, 50, 800, 800, volX - 40, volY - 9, 28, 28);
       } else {
         ctx.save();
         ctx.translate(volX - 38, volY - 11);
@@ -968,7 +968,7 @@ function App() {
       // Volume track bg
       ctx.beginPath();
       ctx.roundRect(volX, volY, volWidth, 10, 5);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.fill();
 
       // Volume filled progress
@@ -979,9 +979,9 @@ function App() {
 
       // Right high-volume speaker icon
       ctx.save();
-      ctx.globalAlpha = 0.55;
+      ctx.globalAlpha = 0.5;
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 7, 32, 24);
+        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 9, 36, 28);
       } else {
         ctx.save();
         ctx.translate(volX + volWidth + 14, volY - 11);
@@ -1017,7 +1017,7 @@ function App() {
       ctx.font = '600 22px Inter';
       const textWidth = ctx.measureText(deviceName).width;
       
-      const pillY = volY + 50;
+      const pillY = volY + 40;
       const pillWidth = 32 + 22 + 14 + textWidth + 32; 
       const pillHeight = 52;
       const pillX = btnCenter - pillWidth / 2;
@@ -1031,7 +1031,7 @@ function App() {
       // AirPlay Audio icon inside pill
       if (airplayImgRef.current && airplayImgRef.current.complete) {
         ctx.save();
-        ctx.translate(pillX + 32 + 11, pillY + 26);
+        ctx.translate(pillX + 32 + 11, pillY + 24);
         ctx.scale(1.05, 1.05);
         ctx.globalAlpha = 1.0;
         const img = airplayImgRef.current;
@@ -1045,7 +1045,7 @@ function App() {
       ctx.font = '600 22px Inter';
       ctx.textAlign = 'left';
       ctx.textBaseline = 'middle';
-      ctx.fillText(deviceName, pillX + 66, pillY + 26);
+      ctx.fillText(deviceName, pillX + 66, pillY + 24);
 
       ctx.restore(); // Restore scaled canvas context
 
@@ -1847,15 +1847,15 @@ function App() {
           const volWidth = detailsW - 80;
 
           ctx.save();
-          ctx.globalAlpha = 1.0;
+          ctx.globalAlpha = 0.95;
           if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-            ctx.drawImage(volumeLowImgRef.current, 0, 0, 1024, 1024, volX - 30, volY - 6, 20, 20);
+            ctx.drawImage(volumeLowImgRef.current, 100, 50, 800, 800, volX - 32, volY - 7, 22, 22);
           }
           ctx.restore();
 
           ctx.beginPath();
           ctx.roundRect(volX, volY, volWidth, 8, 4);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
           ctx.fill();
           ctx.beginPath();
           ctx.roundRect(volX, volY, volWidth * volume, 8, 4);
@@ -1863,16 +1863,16 @@ function App() {
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.55;
+          ctx.globalAlpha = 0.5;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 6, 26, 20);
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 7, 28, 22);
           }
           ctx.restore();
 
           // Device pill
           ctx.font = '600 18px Inter';
           const textW = ctx.measureText(deviceName).width;
-          const pillY = volY + 38;
+          const pillY = volY + 30;
           const pillW = 26 + 18 + 10 + textW + 26;
           const pillH = 42;
           const pillX = btnCenter - pillW / 2;
@@ -2174,9 +2174,9 @@ function App() {
           const volWidth = cardWidth - (artPadding * 2) - 96;
 
           ctx.save();
-          ctx.globalAlpha = 1.0;
+          ctx.globalAlpha = 0.95;
           if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-            ctx.drawImage(volumeLowImgRef.current, 0, 0, 1024, 1024, volX - 36, volY - 7, 24, 24);
+            ctx.drawImage(volumeLowImgRef.current, 100, 50, 800, 800, volX - 40, volY - 9, 28, 28);
           } else {
             ctx.save();
             ctx.translate(volX - 38, volY - 11);
@@ -2191,7 +2191,7 @@ function App() {
 
           ctx.beginPath();
           ctx.roundRect(volX, volY, volWidth, 10, 5);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
           ctx.fill();
           ctx.beginPath();
           ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
@@ -2199,9 +2199,9 @@ function App() {
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.55;
+          ctx.globalAlpha = 0.5;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 7, 32, 24);
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 9, 36, 28);
           } else {
             ctx.save();
             ctx.translate(volX + volWidth + 14, volY - 11);
@@ -2222,7 +2222,7 @@ function App() {
           // Device Selector Pill
           ctx.font = '600 22px Inter';
           const textW = ctx.measureText(deviceName).width;
-          const pillY = volY + 50;
+          const pillY = volY + 40;
           const pillW = 32 + 22 + 14 + textW + 32;
           const pillH = 52;
           const pillX = btnCenter - pillW / 2;
@@ -2233,7 +2233,7 @@ function App() {
 
           if (airplayImgRef.current && airplayImgRef.current.complete) {
             ctx.save();
-            ctx.translate(pillX + 32 + 11, pillY + 26);
+            ctx.translate(pillX + 32 + 11, pillY + 24);
             ctx.scale(1.05, 1.05);
             ctx.globalAlpha = 1.0;
             const img = airplayImgRef.current;
@@ -2246,7 +2246,7 @@ function App() {
           ctx.font = '600 22px Inter';
           ctx.textAlign = 'left';
           ctx.textBaseline = 'middle';
-          ctx.fillText(deviceName, pillX + 66, pillY + 26);
+          ctx.fillText(deviceName, pillX + 66, pillY + 24);
 
           ctx.restore(); // Restore scaled coordinates
         }
