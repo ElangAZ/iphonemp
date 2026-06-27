@@ -979,9 +979,9 @@ function App() {
 
       // Right high-volume speaker icon
       ctx.save();
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.45;
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 9, 36, 28);
+        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
       } else {
         ctx.save();
         ctx.translate(volX + volWidth + 14, volY - 11);
@@ -1863,9 +1863,9 @@ function App() {
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.5;
+          ctx.globalAlpha = 0.45;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 7, 28, 22);
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 5, 24.4, 18.4);
           }
           ctx.restore();
 
@@ -2199,9 +2199,9 @@ function App() {
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.5;
+          ctx.globalAlpha = 0.45;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 9, 36, 28);
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
           } else {
             ctx.save();
             ctx.translate(volX + volWidth + 14, volY - 11);
