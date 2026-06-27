@@ -979,7 +979,7 @@ function App() {
 
       // Right high-volume speaker icon
       ctx.save();
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = 0.35;
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
         ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
       } else {
@@ -1863,7 +1863,7 @@ function App() {
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.45;
+          ctx.globalAlpha = 0.35;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
             ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 5, 24.4, 18.4);
           }
@@ -2199,7 +2199,7 @@ function App() {
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.45;
+          ctx.globalAlpha = 0.35;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
             ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
           } else {
