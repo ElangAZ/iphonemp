@@ -944,9 +944,9 @@ function App() {
       
       // Left low-volume speaker icon
       ctx.save();
-      ctx.globalAlpha = 0.8;
+      ctx.globalAlpha = 1.0;
       if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-        ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 32, volY - 6, 20.3, 22);
+        ctx.drawImage(volumeLowImgRef.current, 0, 0, 1024, 1024, volX - 36, volY - 7, 24, 24);
       } else {
         ctx.save();
         ctx.translate(volX - 38, volY - 11);
@@ -974,14 +974,14 @@ function App() {
       // Volume filled progress
       ctx.beginPath();
       ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+      ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
       ctx.fill();
 
       // Right high-volume speaker icon
       ctx.save();
-      ctx.globalAlpha = 0.45;
+      ctx.globalAlpha = 0.55;
       if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
+        ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 7, 32, 24);
       } else {
         ctx.save();
         ctx.translate(volX + volWidth + 14, volY - 11);
@@ -1847,9 +1847,9 @@ function App() {
           const volWidth = detailsW - 80;
 
           ctx.save();
-          ctx.globalAlpha = 0.8;
+          ctx.globalAlpha = 1.0;
           if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 28, volY - 5, 17, 18.4);
+            ctx.drawImage(volumeLowImgRef.current, 0, 0, 1024, 1024, volX - 30, volY - 6, 20, 20);
           }
           ctx.restore();
 
@@ -1859,13 +1859,13 @@ function App() {
           ctx.fill();
           ctx.beginPath();
           ctx.roundRect(volX, volY, volWidth * volume, 8, 4);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.45;
+          ctx.globalAlpha = 0.55;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 5, 24.4, 18.4);
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 10, volY - 6, 26, 20);
           }
           ctx.restore();
 
@@ -2174,9 +2174,9 @@ function App() {
           const volWidth = cardWidth - (artPadding * 2) - 96;
 
           ctx.save();
-          ctx.globalAlpha = 0.8;
+          ctx.globalAlpha = 1.0;
           if (volumeLowImgRef.current && volumeLowImgRef.current.complete) {
-            ctx.drawImage(volumeLowImgRef.current, 154, 26, 718, 778, volX - 32, volY - 6, 20.3, 22);
+            ctx.drawImage(volumeLowImgRef.current, 0, 0, 1024, 1024, volX - 36, volY - 7, 24, 24);
           } else {
             ctx.save();
             ctx.translate(volX - 38, volY - 11);
@@ -2195,13 +2195,13 @@ function App() {
           ctx.fill();
           ctx.beginPath();
           ctx.roundRect(volX, volY, volWidth * volume, 10, 5);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+          ctx.fillStyle = 'rgba(255, 255, 255, 1.0)';
           ctx.fill();
 
           ctx.save();
-          ctx.globalAlpha = 0.45;
+          ctx.globalAlpha = 0.55;
           if (volumeHighImgRef.current && volumeHighImgRef.current.complete) {
-            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 6, 29.1, 22);
+            ctx.drawImage(volumeHighImgRef.current, 0, 0, 512, 387, volX + volWidth + 12, volY - 7, 32, 24);
           } else {
             ctx.save();
             ctx.translate(volX + volWidth + 14, volY - 11);
