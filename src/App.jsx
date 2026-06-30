@@ -626,11 +626,8 @@ function App() {
       // Premium Glassmorphic Canvas Fill
       ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
       ctx.fill();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-      ctx.lineWidth = 2.0;
-      ctx.stroke();
       ctx.restore();
 
       // Card border removed as requested to avoid white line when rendering
@@ -1600,11 +1597,8 @@ function App() {
           ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
           ctx.fill();
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
           ctx.fill();
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-          ctx.lineWidth = 2.0;
-          ctx.stroke();
           ctx.restore();
 
           // Cover art (left side, square, clean padding)
@@ -1919,11 +1913,8 @@ function App() {
           ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cardRadius);
           ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
           ctx.fill();
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
           ctx.fill();
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-          ctx.lineWidth = 2.0;
-          ctx.stroke();
           ctx.restore();
 
           const artPadding = 35;
