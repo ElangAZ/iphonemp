@@ -88,14 +88,17 @@ const calculateSpectrum = (dataArray, sampleRate, fftSize, config) => {
     }
   }
 
-  const bassThreshold = Math.floor(sampleOutCount * 0.33);
+  const bassRegionCount = Math.max(2, Math.floor(sampleOutCount * 0.33));
   const midThreshold = Math.floor(sampleOutCount * 0.67);
 
   for (let i = 0; i < sampleOutCount; i++) {
     let boost = 1.0;
-    if (i < bassThreshold) {
-      if (i === 0) boost = config.bassBoost1;
-      else boost = config.bassBoost2;
+    if (i < bassRegionCount) {
+      if (i < bassRegionCount / 2) {
+        boost = config.bassBoost1;
+      } else {
+        boost = config.bassBoost2;
+      }
     } else if (i < midThreshold) {
       boost = config.midBoost;
     } else {
