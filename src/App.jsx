@@ -2,6 +2,145 @@ import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import KeyAuthGate from './KeyAuthGate';
 
+const calculateSpectrum = (dataArray, sampleRate, fftSize, config) => {
+  if (!dataArray || dataArray.length === 0) {
+    return new Array(config.sampleOutCount).fill(0);
+  }
+
+  const numBins = dataArray.length; // fftSize / 2
+  const lowerCutoff = config.lowerHzCutoff;
+  const higherCutoff = config.higherHzCutoff;
+
+  const getIndexFromHz = (hz) => {
+    const idx = Math.floor((hz * fftSize) / sampleRate);
+    return Math.max(0, Math.min(numBins - 1, idx));
+  };
+
+  let startIndex = getIndexFromHz(lowerCutoff) + (config.frequencyShift || 0);
+  let endIndex = getIndexFromHz(higherCutoff) + (config.frequencyShift || 0);
+
+  startIndex = Math.max(0, Math.min(numBins - 1, startIndex));
+  endIndex = Math.max(startIndex + 1, Math.min(numBins, endIndex));
+
+  const totalRange = endIndex - startIndex;
+  const sampleOutCount = config.sampleOutCount;
+  const rawSamples = new Array(sampleOutCount).fill(0);
+
+  if (config.provider === 'waveform') {
+    for (let i = 0; i < sampleOutCount; i++) {
+      let idx;
+      if (config.hzDistribution === 'log') {
+        const progress = i / (sampleOutCount - 1 || 1);
+        const logStart = Math.log(startIndex + 1);
+        const logEnd = Math.log(endIndex);
+        const logIdx = Math.exp(logStart + progress * (logEnd - logStart));
+        idx = Math.floor(logIdx) - 1;
+      } else {
+        idx = startIndex + Math.floor((i / (sampleOutCount - 1 || 1)) * totalRange);
+      }
+      idx = Math.max(0, Math.min(dataArray.length - 1, idx));
+      const val = Math.abs((dataArray[idx] || 128) - 128);
+      rawSamples[i] = val * 2;
+    }
+  } else {
+    for (let i = 0; i < sampleOutCount; i++) {
+      let binStart, binEnd;
+      if (config.hzDistribution === 'log') {
+        const progressStart = i / sampleOutCount;
+        const progressEnd = (i + 1) / sampleOutCount;
+        const logStart = Math.log(startIndex + 1);
+        const logEnd = Math.log(endIndex);
+        binStart = Math.floor(Math.exp(logStart + progressStart * (logEnd - logStart))) - 1;
+        binEnd = Math.floor(Math.exp(logStart + progressEnd * (logEnd - logStart))) - 1;
+      } else {
+        binStart = startIndex + Math.floor((i / sampleOutCount) * totalRange);
+        binEnd = startIndex + Math.floor(((i + 1) / sampleOutCount) * totalRange);
+      }
+      binStart = Math.max(0, Math.min(numBins - 1, binStart));
+      binEnd = Math.max(binStart + 1, Math.min(numBins, binEnd));
+
+      let sum = 0;
+      let count = 0;
+      for (let k = binStart; k < binEnd; k++) {
+        sum += dataArray[k] || 0;
+        count++;
+      }
+      rawSamples[i] = count > 0 ? sum / count : 0;
+    }
+  }
+
+  const filteredSamples = [...rawSamples];
+  const radius = config.audioFilterRadius || 0;
+  const strength = config.audioFilterStrength !== undefined ? config.audioFilterStrength : 1.0;
+  if (radius > 0) {
+    for (let i = 0; i < sampleOutCount; i++) {
+      let sum = 0;
+      let count = 0;
+      for (let j = -radius; j <= radius; j++) {
+        const idx = i + j;
+        if (idx >= 0 && idx < sampleOutCount) {
+          sum += rawSamples[idx];
+          count++;
+        }
+      }
+      const averaged = sum / count;
+      filteredSamples[i] = rawSamples[i] * (1 - strength) + averaged * strength;
+    }
+  }
+
+  const bassThreshold = Math.floor(sampleOutCount * 0.33);
+  const midThreshold = Math.floor(sampleOutCount * 0.67);
+
+  for (let i = 0; i < sampleOutCount; i++) {
+    let boost = 1.0;
+    if (i < bassThreshold) {
+      if (i === 0) boost = config.bassBoost1;
+      else boost = config.bassBoost2;
+    } else if (i < midThreshold) {
+      boost = config.midBoost;
+    } else {
+      boost = config.highBoost;
+    }
+    filteredSamples[i] = filteredSamples[i] * boost * config.outputMultiplier;
+  }
+
+  let processed = [...filteredSamples];
+  if (config.mirrorSamples) {
+    const len = processed.length;
+    const half = Math.floor(len / 2);
+    processed = new Array(len).fill(0);
+    for (let i = 0; i < len; i++) {
+      const distFromCenter = Math.abs(i - (len - 1) / 2);
+      const sourceIdx = Math.max(0, Math.min(len - 1, Math.floor(len / 2 - distFromCenter)));
+      processed[i] = filteredSamples[sourceIdx] || 0;
+    }
+  } else if (config.repeatSamples) {
+    const len = processed.length;
+    const half = Math.max(1, Math.floor(len / 2));
+    for (let i = 0; i < len; i++) {
+      processed[i] = filteredSamples[i % half];
+    }
+  }
+
+  const gapCount = config.startEndGap || 0;
+  if (gapCount > 0) {
+    const padded = new Array(processed.length).fill(0);
+    const available = processed.length - 2 * gapCount;
+    if (available > 0) {
+      for (let i = 0; i < available; i++) {
+        const targetIdx = gapCount + i;
+        const sourceIdx = Math.floor((i / (available - 1 || 1)) * (processed.length - 1));
+        padded[targetIdx] = processed[sourceIdx];
+      }
+      processed = padded;
+    } else {
+      processed = new Array(processed.length).fill(0);
+    }
+  }
+
+  return processed;
+};
+
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -51,6 +190,57 @@ function App() {
   const [audioFadeDuration, setAudioFadeDuration] = useState('1'); // Audio fade duration in seconds
   const [usedNativeMp4, setUsedNativeMp4] = useState(false); // Track if native MP4 was used
   const [nativeRenderUri, setNativeRenderUri] = useState('');
+
+  const [specConfig, setSpecConfig] = useState({
+    provider: 'spectrum',
+    captureDuration: 100,
+    highQuality: false,
+    sampleOutCount: 6,
+    mirrorSamples: false,
+    repeatSamples: false,
+    startEndGap: 0,
+    temporalSmooth: 0.75,
+    audioFilterRadius: 1,
+    audioFilterStrength: 1.0,
+    bassBoost1: 1.6,
+    bassBoost2: 1.0,
+    midBoost: 1.0,
+    highBoost: 1.0,
+    outputMultiplier: 1.0,
+    lowerHzCutoff: 20,
+    middleHzCutoff: 1000,
+    higherHzCutoff: 8000,
+    hzDistribution: 'log',
+    frequencyShift: 0,
+    color: 'rgba(255, 255, 255, 0.5)',
+    glowIntensity: 0,
+    barWidth: 2.5,
+    barGap: 3,
+    symmetric: true,
+    heightScale: 1.0,
+    minHeight: 1.5,
+    maxHeight: 20
+  });
+
+  const [activeSpecSection, setActiveSpecSection] = useState(null);
+
+  const specConfigRef = useRef(specConfig);
+  useEffect(() => {
+    specConfigRef.current = specConfig;
+  }, [specConfig]);
+
+  useEffect(() => {
+    if (analyserRef.current) {
+      analyserRef.current.fftSize = specConfig.highQuality ? 2048 : 512;
+    }
+  }, [specConfig.highQuality]);
+
+  useEffect(() => {
+    const size = specConfig.highQuality ? 2048 : 512;
+    fftReRef.current = new Float32Array(size);
+    fftImRef.current = new Float32Array(size);
+    fftMagRef.current = new Uint8Array(size / 2);
+  }, [specConfig.highQuality]);
 
   // Landscape layout adjustment states
   const [landscapeCardWidth, setLandscapeCardWidth] = useState(1000);
@@ -1114,7 +1304,7 @@ function App() {
   const getFFTDataAtTime = (audioBuffer, time) => {
     const sampleRate = audioBuffer.sampleRate;
     const startIndex = Math.floor(time * sampleRate);
-    const fftSize = 512;
+    const fftSize = specConfig.highQuality ? 2048 : 512;
     const re = fftReRef.current;
     const im = fftImRef.current;
     
@@ -1145,6 +1335,34 @@ function App() {
     }
 
     return magnitudes;
+  };
+
+  const exportPreset = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(specConfig, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `${songTitle.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_preset.nmp`);
+    dlAnchorElem.click();
+  };
+
+  const importPreset = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target.result);
+        if (parsed.provider !== undefined && parsed.sampleOutCount !== undefined) {
+          setSpecConfig(prev => ({ ...prev, ...parsed }));
+          alert("Preset .nmp berhasil di-load!");
+        } else {
+          alert("Format file .nmp tidak valid.");
+        }
+      } catch (err) {
+        alert("Gagal membaca file preset: " + err.message);
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Video recording toggle handler (High definition canvas output with Web Audio context source)
@@ -1518,8 +1736,8 @@ function App() {
       let frameIndex = 0;
       const totalFrames = Math.ceil((end - start) / timeStep);
 
-      const videoSmoothHeights = new Array(6).fill(0);
-      const prevMagnitudes = new Float32Array(256);
+      const videoSmoothHeights = new Array(specConfig.sampleOutCount).fill(0);
+      const prevMagnitudes = new Float32Array(specConfig.highQuality ? 1024 : 256);
       const renderStartTime = performance.now();
       let renderScrollOffset = 0;
       let renderScrollPauseTicks = Math.round(2 * fps);
@@ -1549,10 +1767,12 @@ function App() {
         }
 
         const rawMagnitudes = getFFTDataAtTime(decodedBuffer, currentTime);
-        const magnitudes = new Uint8Array(256);
-        const smoothing = 0.82;
-        for (let i = 0; i < 256; i++) {
-          const smoothedVal = prevMagnitudes[i] * smoothing + rawMagnitudes[i] * (1 - smoothing);
+        const fftSize = specConfig.highQuality ? 2048 : 512;
+        const magnitudesLength = fftSize / 2;
+        const magnitudes = new Uint8Array(magnitudesLength);
+        const smoothing = specConfig.temporalSmooth;
+        for (let i = 0; i < magnitudesLength; i++) {
+          const smoothedVal = prevMagnitudes[i] * smoothing + (rawMagnitudes[i] || 0) * (1 - smoothing);
           magnitudes[i] = smoothedVal;
           prevMagnitudes[i] = smoothedVal;
         }
@@ -1717,32 +1937,51 @@ function App() {
           ctx.fillText(songArtist, detailsX, detailsTop + 48);
 
           // Spectrum (right-aligned with the artist line)
-          const specBarCount = 6;
-          const specGap = 3;
+          const specBarCount = specConfig.sampleOutCount;
+          const specGap = specConfig.barGap;
           const specHeight = 36;
-          const specBarWidth = 2.5;
+          const specBarWidth = specConfig.barWidth;
           const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
           const specX = detailsX + detailsW - specTotalWidth;
           const specCenterY = detailsTop + 42; // Aligned near the artist name
+          
+          const processedArray = calculateSpectrum(magnitudes, decodedBuffer.sampleRate, fftSize, specConfig);
+          
           for (let i = 0; i < specBarCount; i++) {
-            let val = 0;
-            if (i === 0) { val = (magnitudes[0] + magnitudes[1]) / 2; }
-            else { const freqBins = [20, 36, 56, 80, 110]; val = magnitudes[freqBins[i - 1] || 20] || 0; }
-            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
-            const targetHeight = normalized * (specHeight / 2);
-            const decayRate = 0.75;
+            const val = processedArray[i] || 0;
+            const normalized = Math.pow(val / 255, 1.8);
+            let targetHeight = normalized * (specHeight / 2) * specConfig.heightScale;
+            targetHeight = Math.max(specConfig.minHeight, Math.min(specConfig.maxHeight, targetHeight));
+            
+            const decayRate = specConfig.temporalSmooth;
             if (targetHeight > videoSmoothHeights[i]) { videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0; }
             else { videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate; }
-            const halfH = Math.max(1.5, videoSmoothHeights[i]);
+            
+            const currentHeight = videoSmoothHeights[i];
+            const halfH = specConfig.symmetric ? Math.max(specConfig.minHeight, currentHeight / 2) : Math.max(specConfig.minHeight, currentHeight);
             const bx = specX + i * (specBarWidth + specGap);
-            ctx.beginPath();
-            ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
-            ctx.beginPath();
-            ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
+
+            ctx.save();
+            if (specConfig.glowIntensity > 0) {
+              ctx.shadowBlur = specConfig.glowIntensity;
+              ctx.shadowColor = specConfig.color;
+            }
+            ctx.fillStyle = specConfig.color;
+
+            if (specConfig.symmetric) {
+              ctx.beginPath();
+              ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, specBarWidth / 2.5);
+              ctx.fill();
+
+              ctx.beginPath();
+              ctx.roundRect(bx, specCenterY, specBarWidth, halfH, specBarWidth / 2.5);
+              ctx.fill();
+            } else {
+              ctx.beginPath();
+              ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, specBarWidth / 2.5);
+              ctx.fill();
+            }
+            ctx.restore();
           }
 
           // Seekbar
@@ -2028,43 +2267,54 @@ function App() {
           ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
 
           // Draw Spectrum
-          const specBarCount = 6;
-          const specGap = 3;
+          const specBarCount = specConfig.sampleOutCount;
+          const specGap = specConfig.barGap;
           const specHeight = 40;
-          const specBarWidth = 2.5;
+          const specBarWidth = specConfig.barWidth;
           const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
           const specX = cardX + cardWidth - artPadding - specTotalWidth;
           const specCenterY = infoY + 10;
 
+          const processedArray = calculateSpectrum(magnitudes, decodedBuffer.sampleRate, fftSize, specConfig);
+
           for (let i = 0; i < specBarCount; i++) {
-            let val = 0;
-            if (i === 0) {
-              let bassSum = magnitudes[0] + magnitudes[1];
-              val = bassSum / 2;
-            } else {
-              const freqBins = [20, 36, 56, 80, 110];
-              val = magnitudes[freqBins[i - 1] || 20] || 0;
-            }
-            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
-            const targetHeight = normalized * (specHeight / 2);
-            const decayRate = 0.75;
+            const val = processedArray[i] || 0;
+            const normalized = Math.pow(val / 255, 1.8);
+            let targetHeight = normalized * (specHeight / 2) * specConfig.heightScale;
+            targetHeight = Math.max(specConfig.minHeight, Math.min(specConfig.maxHeight, targetHeight));
+            
+            const decayRate = specConfig.temporalSmooth;
             if (targetHeight > videoSmoothHeights[i]) {
               videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0;
             } else {
               videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate;
             }
-            const halfH = Math.max(1.5, videoSmoothHeights[i]);
+            
+            const currentHeight = videoSmoothHeights[i];
+            const halfH = specConfig.symmetric ? Math.max(specConfig.minHeight, currentHeight / 2) : Math.max(specConfig.minHeight, currentHeight);
             const bx = specX + i * (specBarWidth + specGap);
 
-            ctx.beginPath();
-            ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, 1);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
+            ctx.save();
+            if (specConfig.glowIntensity > 0) {
+              ctx.shadowBlur = specConfig.glowIntensity;
+              ctx.shadowColor = specConfig.color;
+            }
+            ctx.fillStyle = specConfig.color;
 
-            ctx.beginPath();
-            ctx.roundRect(bx, specCenterY, specBarWidth, halfH, 1);
-            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.fill();
+            if (specConfig.symmetric) {
+              ctx.beginPath();
+              ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, specBarWidth / 2.5);
+              ctx.fill();
+
+              ctx.beginPath();
+              ctx.roundRect(bx, specCenterY, specBarWidth, halfH, specBarWidth / 2.5);
+              ctx.fill();
+            } else {
+              ctx.beginPath();
+              ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, specBarWidth / 2.5);
+              ctx.fill();
+            }
+            ctx.restore();
           }
 
           // Seekbar
@@ -2743,31 +2993,45 @@ function App() {
     let animationFrameId;
 
     const draw = () => {
+      const config = specConfigRef.current;
       let dataArray = new Uint8Array(0);
+      const sampleRate = audioContextRef.current ? audioContextRef.current.sampleRate : 44100;
+      const fftSize = config.highQuality ? 2048 : 512;
+
       if (analyserRef.current && isPlaying) {
         const bufferLength = analyserRef.current.frequencyBinCount;
         dataArray = new Uint8Array(bufferLength);
-        analyserRef.current.getByteFrequencyData(dataArray);
+        if (config.provider === 'waveform') {
+          analyserRef.current.getByteTimeDomainData(dataArray);
+        } else {
+          analyserRef.current.getByteFrequencyData(dataArray);
+        }
       }
 
-      const barCount = 6;
-      const gap = 2;
-      const barWidth = 2;
+      const barCount = config.sampleOutCount;
+      const gap = config.barGap;
+      const barWidth = config.barWidth;
       const totalWidth = barCount * barWidth + (barCount - 1) * gap;
 
       const canvases = [
-        { el: uiCanvasRef.current, smooths: uiCanvasRef.current?.__smooths || new Array(barCount).fill(0) },
-        { el: editorVisualizerRef.current, smooths: editorVisualizerRef.current?.__smooths || new Array(barCount).fill(0) }
+        { el: uiCanvasRef.current, smooths: [] },
+        { el: editorVisualizerRef.current, smooths: [] }
       ];
 
-      // Store smooth heights array on the DOM elements to persist across frames
-      if (uiCanvasRef.current && !uiCanvasRef.current.__smooths) uiCanvasRef.current.__smooths = canvases[0].smooths;
-      if (editorVisualizerRef.current && !editorVisualizerRef.current.__smooths) editorVisualizerRef.current.__smooths = canvases[1].smooths;
+      canvases.forEach(c => {
+        if (c.el) {
+          if (!c.el.__smooths || c.el.__smooths.length !== barCount) {
+            c.el.__smooths = new Array(barCount).fill(0);
+          }
+          c.smooths = c.el.__smooths;
+        }
+      });
+
+      const processedArray = calculateSpectrum(dataArray, sampleRate, fftSize, config);
 
       canvases.forEach(({ el, smooths }) => {
         if (!el) return;
         
-        // Auto resize canvas to bounding box
         const rect = el.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
         const targetW = Math.round(rect.width * dpr);
@@ -2787,42 +3051,43 @@ function App() {
         const offsetX = (width - totalWidth) / 2;
         
         for (let i = 0; i < barCount; i++) {
-          let val = 0;
-          if (dataArray.length > 0) {
-            if (i === 0) {
-              let bassSum = 0;
-              for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
-              const bassAvg = bassSum / 2;
-              val = bassAvg > 145 ? (bassAvg - 145) * 1.6 : 0;
-            } else {
-              const freqBins = [20, 36, 56, 80, 110];
-              const dataIdx = freqBins[i - 1] || 20;
-              val = dataArray[dataIdx] || 0;
-            }
-          }
-
-          const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
-          const targetHeight = normalized * height;
+          const val = processedArray[i] || 0;
+          const normalized = Math.pow(val / 255, 1.8);
+          let targetHeight = normalized * height * config.heightScale;
+          targetHeight = Math.max(config.minHeight, Math.min(config.maxHeight, targetHeight));
           
-          const decayRate = 0.75;
+          const decayRate = config.temporalSmooth;
           if (targetHeight > smooths[i]) {
             smooths[i] += (targetHeight - smooths[i]) * 1.0;
           } else {
             smooths[i] -= (smooths[i] - targetHeight) * decayRate;
           }
 
-          const halfH = Math.max(1, smooths[i] / 2);
+          const currentHeight = smooths[i];
+          const halfH = config.symmetric ? Math.max(config.minHeight, currentHeight / 2) : Math.max(config.minHeight, currentHeight);
           const x = offsetX + i * (barWidth + gap);
 
-          ctx.beginPath();
-          ctx.roundRect(x, centerY - halfH, barWidth, halfH, 0.8);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.fill();
+          ctx.save();
+          if (config.glowIntensity > 0) {
+            ctx.shadowBlur = config.glowIntensity;
+            ctx.shadowColor = config.color;
+          }
+          ctx.fillStyle = config.color;
 
-          ctx.beginPath();
-          ctx.roundRect(x, centerY, barWidth, halfH, 0.8);
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.fill();
+          if (config.symmetric) {
+            ctx.beginPath();
+            ctx.roundRect(x, centerY - halfH, barWidth, halfH, barWidth / 2.5);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.roundRect(x, centerY, barWidth, halfH, barWidth / 2.5);
+            ctx.fill();
+          } else {
+            ctx.beginPath();
+            ctx.roundRect(x, centerY - halfH, barWidth, halfH, barWidth / 2.5);
+            ctx.fill();
+          }
+          ctx.restore();
         }
       });
 
@@ -3525,6 +3790,469 @@ function App() {
                         </div>
                       </div>
                     )}
+
+                    {/* SPECTRUM VISUALIZER SETTINGS PANEL */}
+                    <h3 className="editor-settings-title" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>SPECTRUM VISUALIZER</h3>
+                    
+                    {/* Preset Actions */}
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                      <button 
+                        onClick={exportPreset} 
+                        className="editor-opt-btn" 
+                        style={{ flex: 1, padding: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '600' }}
+                      >
+                        📥 Export Preset (.nmp)
+                      </button>
+                      <label 
+                        className="editor-opt-btn" 
+                        style={{ flex: 1, padding: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                      >
+                        📤 Import Preset (.nmp)
+                        <input type="file" accept=".nmp" onChange={importPreset} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      {/* Section 1: Audio Capture & Source */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button 
+                          onClick={() => setActiveSpecSection(activeSpecSection === 'capture' ? null : 'capture')}
+                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                        >
+                          <span>AUDIO CAPTURE & SOURCE</span>
+                          <span>{activeSpecSection === 'capture' ? '▼' : '▶'}</span>
+                        </button>
+                        {activeSpecSection === 'capture' && (
+                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div className="editor-setting-card" style={{ background: 'none', border: 'none', padding: 0 }}>
+                              <span className="editor-setting-label">SPECTRUM PROVIDER</span>
+                              <div className="editor-setting-options" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                                {['spectrum', 'waveform', 'spectrum 2'].map(prov => (
+                                  <button 
+                                    key={prov}
+                                    className={`editor-opt-btn ${specConfig.provider === prov ? 'active' : ''}`}
+                                    onClick={() => setSpecConfig(prev => ({ ...prev, provider: prov }))}
+                                    style={{ flex: 1, padding: '6px 4px', fontSize: '11px', textTransform: 'capitalize' }}
+                                  >{prov}</button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Capture Duration</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="1" max="500" step="5"
+                                  value={specConfig.captureDuration}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, captureDuration: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.captureDuration}ms</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                              <span className="editor-setting-label">HIGH QUALITY CAPTURE</span>
+                              <label className="editor-switch">
+                                <input 
+                                  type="checkbox" 
+                                  checked={specConfig.highQuality} 
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, highQuality: e.target.checked }))} 
+                                />
+                                <span className="editor-switch-slider"></span>
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 2: Spectrum Dynamics */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button 
+                          onClick={() => setActiveSpecSection(activeSpecSection === 'dynamics' ? null : 'dynamics')}
+                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                        >
+                          <span>SPECTRUM DYNAMICS</span>
+                          <span>{activeSpecSection === 'dynamics' ? '▼' : '▶'}</span>
+                        </button>
+                        {activeSpecSection === 'dynamics' && (
+                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Sample Out Count (Jumlah Bar)</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="2" max="64" step="1"
+                                  value={specConfig.sampleOutCount}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, sampleOutCount: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.sampleOutCount} bars</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                              <span className="editor-setting-label">MIRROR SAMPLES</span>
+                              <label className="editor-switch">
+                                <input 
+                                  type="checkbox" 
+                                  checked={specConfig.mirrorSamples} 
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, mirrorSamples: e.target.checked, repeatSamples: e.target.checked ? false : prev.repeatSamples }))} 
+                                />
+                                <span className="editor-switch-slider"></span>
+                              </label>
+                            </div>
+
+                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                              <span className="editor-setting-label">REPEAT SAMPLES</span>
+                              <label className="editor-switch">
+                                <input 
+                                  type="checkbox" 
+                                  checked={specConfig.repeatSamples} 
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, repeatSamples: e.target.checked, mirrorSamples: e.target.checked ? false : prev.mirrorSamples }))} 
+                                />
+                                <span className="editor-switch-slider"></span>
+                              </label>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Start and End Gap</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0" max="32" step="1"
+                                  value={specConfig.startEndGap}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, startEndGap: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.startEndGap} bars</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Temporal Smooth</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.05" max="0.95" step="0.05"
+                                  value={specConfig.temporalSmooth}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, temporalSmooth: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.temporalSmooth}</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Audio Filter Radius</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0" max="8" step="1"
+                                  value={specConfig.audioFilterRadius}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, audioFilterRadius: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.audioFilterRadius} px</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Audio Filter Strength</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0" max="1" step="0.05"
+                                  value={specConfig.audioFilterStrength}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, audioFilterStrength: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.audioFilterStrength}</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Bass Boost (Bar 1)</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.5" max="5.0" step="0.1"
+                                  value={specConfig.bassBoost1}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, bassBoost1: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.bassBoost1}x</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Bass Boost (Bar 2)</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.5" max="5.0" step="0.1"
+                                  value={specConfig.bassBoost2}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, bassBoost2: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.bassBoost2}x</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Mid Boost (Bar 3-4)</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.5" max="5.0" step="0.1"
+                                  value={specConfig.midBoost}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, midBoost: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.midBoost}x</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">High Boost (Bar 5-6)</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.5" max="5.0" step="0.1"
+                                  value={specConfig.highBoost}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, highBoost: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.highBoost}x</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Output Multiplier</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.1" max="5.0" step="0.1"
+                                  value={specConfig.outputMultiplier}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, outputMultiplier: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.outputMultiplier}x</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 3: Spectrum HZ Bounds */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button 
+                          onClick={() => setActiveSpecSection(activeSpecSection === 'hz' ? null : 'hz')}
+                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                        >
+                          <span>SPECTRUM HZ BOUNDS</span>
+                          <span>{activeSpecSection === 'hz' ? '▼' : '▶'}</span>
+                        </button>
+                        {activeSpecSection === 'hz' && (
+                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Lower HZ Cutoff</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="10" max="500" step="5"
+                                  value={specConfig.lowerHzCutoff}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, lowerHzCutoff: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.lowerHzCutoff} Hz</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Middle HZ Cutoff</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="500" max="4000" step="50"
+                                  value={specConfig.middleHzCutoff}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, middleHzCutoff: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.middleHzCutoff} Hz</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Higher HZ Cutoff</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="4000" max="22000" step="100"
+                                  value={specConfig.higherHzCutoff}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, higherHzCutoff: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.higherHzCutoff} Hz</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-setting-card" style={{ background: 'none', border: 'none', padding: 0 }}>
+                              <span className="editor-setting-label">HZ DISTRIBUTION</span>
+                              <div className="editor-setting-options" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                                <button 
+                                  className={`editor-opt-btn ${specConfig.hzDistribution === 'linear' ? 'active' : ''}`}
+                                  onClick={() => setSpecConfig(prev => ({ ...prev, hzDistribution: 'linear' }))}
+                                  style={{ flex: 1, padding: '6px' }}
+                                >Linear</button>
+                                <button 
+                                  className={`editor-opt-btn ${specConfig.hzDistribution === 'log' ? 'active' : ''}`}
+                                  onClick={() => setSpecConfig(prev => ({ ...prev, hzDistribution: 'log' }))}
+                                  style={{ flex: 1, padding: '6px' }}
+                                >Logarithmic</button>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Frequency Shift</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="-50" max="50" step="1"
+                                  value={specConfig.frequencyShift}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, frequencyShift: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.frequencyShift} bins</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Section 4: Bars Styling */}
+                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <button 
+                          onClick={() => setActiveSpecSection(activeSpecSection === 'styling' ? null : 'styling')}
+                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                        >
+                          <span>BARS STYLING</span>
+                          <span>{activeSpecSection === 'styling' ? '▼' : '▶'}</span>
+                        </button>
+                        {activeSpecSection === 'styling' && (
+                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Color (RGBA/HEX)</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="text" 
+                                  value={specConfig.color}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, color: e.target.value }))}
+                                  style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '6px', borderRadius: '4px', fontSize: '12px' }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Glow Intensity</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0" max="20" step="1"
+                                  value={specConfig.glowIntensity}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, glowIntensity: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.glowIntensity} px</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Bar Width</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.5" max="15.0" step="0.5"
+                                  value={specConfig.barWidth}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, barWidth: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.barWidth} px</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Bar Gap</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0" max="15" step="0.5"
+                                  value={specConfig.barGap}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, barGap: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.barGap} px</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                              <span className="editor-setting-label">SYMMETRIC (UP/BOTTOM)</span>
+                              <label className="editor-switch">
+                                <input 
+                                  type="checkbox" 
+                                  checked={specConfig.symmetric} 
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, symmetric: e.target.checked }))} 
+                                />
+                                <span className="editor-switch-slider"></span>
+                              </label>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Height Scale</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0.1" max="5.0" step="0.1"
+                                  value={specConfig.heightScale}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, heightScale: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.heightScale}x</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Min Height Limit</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="0" max="10" step="0.5"
+                                  value={specConfig.minHeight}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, minHeight: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.minHeight} px</span>
+                              </div>
+                            </div>
+
+                            <div className="editor-fade-duration" style={{ padding: 0 }}>
+                              <span className="editor-setting-sublabel">Max Height Limit</span>
+                              <div className="editor-fade-input-wrap">
+                                <input 
+                                  type="range" 
+                                  min="10" max="150" step="5"
+                                  value={specConfig.maxHeight}
+                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, maxHeight: Number(e.target.value) }))}
+                                  className="editor-fade-slider"
+                                />
+                                <span className="editor-fade-value">{specConfig.maxHeight} px</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
