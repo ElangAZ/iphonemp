@@ -3525,7 +3525,6 @@ function App() {
             width: '100vw',
             height: '100vh',
             background: 'rgba(0, 0, 0, 0.4)',
-            backdropFilter: 'blur(8px)',
             zIndex: 9999,
             display: 'flex',
             justifyContent: 'flex-end',
