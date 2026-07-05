@@ -1333,12 +1333,10 @@ function App() {
     simpleFFT(re, im);
 
     const magnitudes = fftMagRef.current;
-    const minDb = -100;
-    const maxDb = -30;
     for (let i = 0; i < fftSize / 2; i++) {
       const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
-      const db = mag > 0.00001 ? 20 * Math.log10(mag) : -100;
-      let val = Math.round(((db - minDb) / (maxDb - minDb)) * 255);
+      const rawVal = Math.min(255, mag * 400);
+      let val = Math.round(255 * Math.pow(rawVal / 255, 0.45));
       magnitudes[i] = Math.max(0, Math.min(255, val));
     }
 
