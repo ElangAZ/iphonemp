@@ -1943,7 +1943,7 @@ function App() {
           // Spectrum (right-aligned with the artist line)
           const specBarCount = specConfig.sampleOutCount;
           const specGap = specConfig.barGap;
-          const specHeight = 36;
+          const specHeight = 80;
           const specBarWidth = specConfig.barWidth;
           const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
           const specX = detailsX + detailsW - specTotalWidth;
@@ -2273,7 +2273,7 @@ function App() {
           // Draw Spectrum
           const specBarCount = specConfig.sampleOutCount;
           const specGap = specConfig.barGap;
-          const specHeight = 40;
+          const specHeight = 100;
           const specBarWidth = specConfig.barWidth;
           const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
           const specX = cardX + cardWidth - artPadding - specTotalWidth;
@@ -3986,7 +3986,7 @@ function App() {
                       <div className="editor-fade-input-wrap">
                         <input 
                           type="range" 
-                          min="0.1" max="5.0" step="0.1"
+                          min="0.1" max="25.0" step="0.1"
                           value={specConfig.heightScale}
                           onChange={(e) => setSpecConfig(prev => ({ ...prev, heightScale: Number(e.target.value) }))}
                           className="editor-fade-slider"
