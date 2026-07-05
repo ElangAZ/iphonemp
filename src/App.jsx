@@ -1333,9 +1333,13 @@ function App() {
     simpleFFT(re, im);
 
     const magnitudes = fftMagRef.current;
+    const minDb = -100;
+    const maxDb = -30;
     for (let i = 0; i < fftSize / 2; i++) {
       const mag = Math.sqrt(re[i] * re[i] + im[i] * im[i]);
-      magnitudes[i] = Math.min(255, Math.floor(mag * 380));
+      const db = mag > 0.00001 ? 20 * Math.log10(mag) : -100;
+      let val = Math.round(((db - minDb) / (maxDb - minDb)) * 255);
+      magnitudes[i] = Math.max(0, Math.min(255, val));
     }
 
     return magnitudes;
