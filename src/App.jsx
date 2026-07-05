@@ -223,6 +223,7 @@ function App() {
   });
 
   const [activeSpecSection, setActiveSpecSection] = useState(null);
+  const [showSpecSettings, setShowSpecSettings] = useState(false);
 
   const specConfigRef = useRef(specConfig);
   useEffect(() => {
@@ -3009,9 +3010,6 @@ function App() {
       }
 
       const barCount = config.sampleOutCount;
-      const gap = config.barGap;
-      const barWidth = config.barWidth;
-      const totalWidth = barCount * barWidth + (barCount - 1) * gap;
 
       const canvases = [
         { el: uiCanvasRef.current, smooths: [] },
@@ -3047,6 +3045,16 @@ function App() {
         const height = el.height;
         const centerY = height / 2;
         ctx.clearRect(0, 0, width, height);
+
+        let gap = config.barGap;
+        let barWidth = config.barWidth;
+        let totalWidth = barCount * barWidth + (barCount - 1) * gap;
+        if (totalWidth > width) {
+          const scale = width / (totalWidth || 1);
+          barWidth = Math.max(1, barWidth * scale);
+          gap = Math.max(0.5, gap * scale);
+          totalWidth = barCount * barWidth + (barCount - 1) * gap;
+        }
 
         const offsetX = (width - totalWidth) / 2;
         
@@ -3214,6 +3222,23 @@ function App() {
             <i className="fa-solid fa-laptop"></i> Landscape
           </button>
         </div>
+
+        <button 
+          className="upload-btn"
+          onClick={() => setShowSpecSettings(true)}
+          style={{
+            background: 'rgba(99, 102, 241, 0.2)',
+            border: '1px solid rgba(99, 102, 241, 0.4)',
+            color: '#c7d2fe',
+            marginRight: '8px'
+          }}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '6px', width: '16px', height: '16px' }}>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+          Visualizer Settings
+        </button>
 
         <button className="upload-btn" onClick={() => fileInputRef.current.click()}>
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -3488,6 +3513,520 @@ function App() {
           </div>
         </div>
       </div>
+
+      {/* ===== Floating Spectrum Settings Sidebar ===== */}
+      {showSpecSettings && (
+        <div 
+          className="editor-overlay"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(0, 0, 0, 0.4)',
+            backdropFilter: 'blur(8px)',
+            zIndex: 9999,
+            display: 'flex',
+            justifyContent: 'flex-end',
+            animation: 'fadeIn 0.25s ease'
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowSpecSettings(false);
+          }}
+        >
+          <div 
+            style={{
+              width: '400px',
+              maxWidth: '90vw',
+              height: '100%',
+              background: 'rgba(18, 18, 28, 0.95)',
+              borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+              boxShadow: '-10px 0 30px rgba(0,0,0,0.5)',
+              display: 'flex',
+              flexDirection: 'column',
+              padding: '24px',
+              overflowY: 'auto',
+              boxSizing: 'border-box'
+            }}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', paddingBottom: '14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: '18px', fontWeight: '700', letterSpacing: '0.5px' }}>VISUALIZER SETTINGS</h3>
+              <button 
+                onClick={() => setShowSpecSettings(false)}
+                style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', padding: '4px' }}
+              >
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            </div>
+
+            {/* Preset Actions */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+              <button 
+                onClick={exportPreset} 
+                className="editor-opt-btn" 
+                style={{ flex: 1, padding: '10px', fontSize: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '8px', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '600' }}
+              >
+                📥 Export Preset (.nmp)
+              </button>
+              <label 
+                className="editor-opt-btn" 
+                style={{ flex: 1, padding: '10px', fontSize: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '8px', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                📤 Import Preset (.nmp)
+                <input type="file" accept=".nmp" onChange={importPreset} style={{ display: 'none' }} />
+              </label>
+            </div>
+
+            {/* Config Panels */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {/* Section 1: Audio Capture & Source */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <button 
+                  onClick={() => setActiveSpecSection(activeSpecSection === 'capture' ? null : 'capture')}
+                  style={{ width: '100%', padding: '14px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                >
+                  <span>AUDIO CAPTURE & SOURCE</span>
+                  <span>{activeSpecSection === 'capture' ? '▼' : '▶'}</span>
+                </button>
+                {activeSpecSection === 'capture' && (
+                  <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="editor-setting-card" style={{ background: 'none', border: 'none', padding: 0 }}>
+                      <span className="editor-setting-label">SPECTRUM PROVIDER</span>
+                      <div className="editor-setting-options" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                        {['spectrum', 'waveform', 'spectrum 2'].map(prov => (
+                          <button 
+                            key={prov}
+                            className={`editor-opt-btn ${specConfig.provider === prov ? 'active' : ''}`}
+                            onClick={() => setSpecConfig(prev => ({ ...prev, provider: prov }))}
+                            style={{ flex: 1, padding: '8px 4px', fontSize: '11px', textTransform: 'capitalize' }}
+                          >{prov}</button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Capture Duration</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="1" max="500" step="5"
+                          value={specConfig.captureDuration}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, captureDuration: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.captureDuration}ms</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                      <span className="editor-setting-label">HIGH QUALITY CAPTURE</span>
+                      <label className="editor-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={specConfig.highQuality} 
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, highQuality: e.target.checked }))} 
+                        />
+                        <span className="editor-switch-slider"></span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 2: Spectrum Dynamics */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <button 
+                  onClick={() => setActiveSpecSection(activeSpecSection === 'dynamics' ? null : 'dynamics')}
+                  style={{ width: '100%', padding: '14px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                >
+                  <span>SPECTRUM DYNAMICS</span>
+                  <span>{activeSpecSection === 'dynamics' ? '▼' : '▶'}</span>
+                </button>
+                {activeSpecSection === 'dynamics' && (
+                  <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Sample Out Count (Jumlah Bar)</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="2" max="64" step="1"
+                          value={specConfig.sampleOutCount}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, sampleOutCount: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.sampleOutCount} bars</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                      <span className="editor-setting-label">MIRROR SAMPLES</span>
+                      <label className="editor-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={specConfig.mirrorSamples} 
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, mirrorSamples: e.target.checked, repeatSamples: e.target.checked ? false : prev.repeatSamples }))} 
+                        />
+                        <span className="editor-switch-slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                      <span className="editor-setting-label">REPEAT SAMPLES</span>
+                      <label className="editor-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={specConfig.repeatSamples} 
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, repeatSamples: e.target.checked, mirrorSamples: e.target.checked ? false : prev.mirrorSamples }))} 
+                        />
+                        <span className="editor-switch-slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Start and End Gap</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0" max="32" step="1"
+                          value={specConfig.startEndGap}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, startEndGap: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.startEndGap} bars</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Temporal Smooth</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.05" max="0.95" step="0.05"
+                          value={specConfig.temporalSmooth}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, temporalSmooth: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.temporalSmooth}</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Audio Filter Radius</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0" max="8" step="1"
+                          value={specConfig.audioFilterRadius}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, audioFilterRadius: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.audioFilterRadius} px</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Audio Filter Strength</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0" max="1" step="0.05"
+                          value={specConfig.audioFilterStrength}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, audioFilterStrength: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.audioFilterStrength}</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Bass Boost (Bar 1)</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.5" max="5.0" step="0.1"
+                          value={specConfig.bassBoost1}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, bassBoost1: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.bassBoost1}x</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Bass Boost (Bar 2)</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.5" max="5.0" step="0.1"
+                          value={specConfig.bassBoost2}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, bassBoost2: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.bassBoost2}x</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Mid Boost (Bar 3-4)</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.5" max="5.0" step="0.1"
+                          value={specConfig.midBoost}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, midBoost: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.midBoost}x</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">High Boost (Bar 5-6)</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.5" max="5.0" step="0.1"
+                          value={specConfig.highBoost}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, highBoost: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.highBoost}x</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Output Multiplier</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.1" max="5.0" step="0.1"
+                          value={specConfig.outputMultiplier}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, outputMultiplier: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.outputMultiplier}x</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Spectrum HZ Bounds */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <button 
+                  onClick={() => setActiveSpecSection(activeSpecSection === 'hz' ? null : 'hz')}
+                  style={{ width: '100%', padding: '14px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                >
+                  <span>SPECTRUM HZ BOUNDS</span>
+                  <span>{activeSpecSection === 'hz' ? '▼' : '▶'}</span>
+                </button>
+                {activeSpecSection === 'hz' && (
+                  <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Lower HZ Cutoff</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="10" max="500" step="5"
+                          value={specConfig.lowerHzCutoff}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, lowerHzCutoff: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.lowerHzCutoff} Hz</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Middle HZ Cutoff</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="500" max="4000" step="50"
+                          value={specConfig.middleHzCutoff}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, middleHzCutoff: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.middleHzCutoff} Hz</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Higher HZ Cutoff</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="4000" max="22000" step="100"
+                          value={specConfig.higherHzCutoff}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, higherHzCutoff: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.higherHzCutoff} Hz</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-setting-card" style={{ background: 'none', border: 'none', padding: 0 }}>
+                      <span className="editor-setting-label">HZ DISTRIBUTION</span>
+                      <div className="editor-setting-options" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
+                        <button 
+                          className={`editor-opt-btn ${specConfig.hzDistribution === 'linear' ? 'active' : ''}`}
+                          onClick={() => setSpecConfig(prev => ({ ...prev, hzDistribution: 'linear' }))}
+                          style={{ flex: 1, padding: '8px' }}
+                        >Linear</button>
+                        <button 
+                          className={`editor-opt-btn ${specConfig.hzDistribution === 'log' ? 'active' : ''}`}
+                          onClick={() => setSpecConfig(prev => ({ ...prev, hzDistribution: 'log' }))}
+                          style={{ flex: 1, padding: '8px' }}
+                        >Logarithmic</button>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Frequency Shift</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="-50" max="50" step="1"
+                          value={specConfig.frequencyShift}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, frequencyShift: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.frequencyShift} bins</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Section 4: Bars Styling */}
+              <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <button 
+                  onClick={() => setActiveSpecSection(activeSpecSection === 'styling' ? null : 'styling')}
+                  style={{ width: '100%', padding: '14px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '13px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
+                >
+                  <span>BARS STYLING</span>
+                  <span>{activeSpecSection === 'styling' ? '▼' : '▶'}</span>
+                </button>
+                {activeSpecSection === 'styling' && (
+                  <div style={{ padding: '14px', display: 'flex', flexDirection: 'column', gap: '14px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Color (RGBA/HEX)</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="text" 
+                          value={specConfig.color}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, color: e.target.value }))}
+                          style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '8px', borderRadius: '4px', fontSize: '12px' }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Glow Intensity</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0" max="20" step="1"
+                          value={specConfig.glowIntensity}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, glowIntensity: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.glowIntensity} px</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Bar Width</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.5" max="15.0" step="0.5"
+                          value={specConfig.barWidth}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, barWidth: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.barWidth} px</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Bar Gap</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0" max="15" step="0.5"
+                          value={specConfig.barGap}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, barGap: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.barGap} px</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
+                      <span className="editor-setting-label">SYMMETRIC (UP/BOTTOM)</span>
+                      <label className="editor-switch">
+                        <input 
+                          type="checkbox" 
+                          checked={specConfig.symmetric} 
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, symmetric: e.target.checked }))} 
+                        />
+                        <span className="editor-switch-slider"></span>
+                      </label>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Height Scale</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0.1" max="5.0" step="0.1"
+                          value={specConfig.heightScale}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, heightScale: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.heightScale}x</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Min Height Limit</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="0" max="10" step="0.5"
+                          value={specConfig.minHeight}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, minHeight: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.minHeight} px</span>
+                      </div>
+                    </div>
+
+                    <div className="editor-fade-duration" style={{ padding: 0 }}>
+                      <span className="editor-setting-sublabel">Max Height Limit</span>
+                      <div className="editor-fade-input-wrap">
+                        <input 
+                          type="range" 
+                          min="10" max="150" step="5"
+                          value={specConfig.maxHeight}
+                          onChange={(e) => setSpecConfig(prev => ({ ...prev, maxHeight: Number(e.target.value) }))}
+                          className="editor-fade-slider"
+                        />
+                        <span className="editor-fade-value">{specConfig.maxHeight} px</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DOM placeholders to prevent background visualizer scripts (if any) from throwing TypeErrors */}
       <div className="visualizer" style={{ display: 'none' }} />
@@ -3791,468 +4330,6 @@ function App() {
                       </div>
                     )}
 
-                    {/* SPECTRUM VISUALIZER SETTINGS PANEL */}
-                    <h3 className="editor-settings-title" style={{ marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '20px' }}>SPECTRUM VISUALIZER</h3>
-                    
-                    {/* Preset Actions */}
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-                      <button 
-                        onClick={exportPreset} 
-                        className="editor-opt-btn" 
-                        style={{ flex: 1, padding: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '600' }}
-                      >
-                        📥 Export Preset (.nmp)
-                      </button>
-                      <label 
-                        className="editor-opt-btn" 
-                        style={{ flex: 1, padding: '8px', fontSize: '12px', background: 'rgba(255,255,255,0.08)', borderRadius: '6px', border: 'none', color: '#fff', cursor: 'pointer', fontWeight: '600', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                      >
-                        📤 Import Preset (.nmp)
-                        <input type="file" accept=".nmp" onChange={importPreset} style={{ display: 'none' }} />
-                      </label>
-                    </div>
-
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                      {/* Section 1: Audio Capture & Source */}
-                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <button 
-                          onClick={() => setActiveSpecSection(activeSpecSection === 'capture' ? null : 'capture')}
-                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
-                        >
-                          <span>AUDIO CAPTURE & SOURCE</span>
-                          <span>{activeSpecSection === 'capture' ? '▼' : '▶'}</span>
-                        </button>
-                        {activeSpecSection === 'capture' && (
-                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="editor-setting-card" style={{ background: 'none', border: 'none', padding: 0 }}>
-                              <span className="editor-setting-label">SPECTRUM PROVIDER</span>
-                              <div className="editor-setting-options" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-                                {['spectrum', 'waveform', 'spectrum 2'].map(prov => (
-                                  <button 
-                                    key={prov}
-                                    className={`editor-opt-btn ${specConfig.provider === prov ? 'active' : ''}`}
-                                    onClick={() => setSpecConfig(prev => ({ ...prev, provider: prov }))}
-                                    style={{ flex: 1, padding: '6px 4px', fontSize: '11px', textTransform: 'capitalize' }}
-                                  >{prov}</button>
-                                ))}
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Capture Duration</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="1" max="500" step="5"
-                                  value={specConfig.captureDuration}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, captureDuration: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.captureDuration}ms</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
-                              <span className="editor-setting-label">HIGH QUALITY CAPTURE</span>
-                              <label className="editor-switch">
-                                <input 
-                                  type="checkbox" 
-                                  checked={specConfig.highQuality} 
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, highQuality: e.target.checked }))} 
-                                />
-                                <span className="editor-switch-slider"></span>
-                              </label>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Section 2: Spectrum Dynamics */}
-                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <button 
-                          onClick={() => setActiveSpecSection(activeSpecSection === 'dynamics' ? null : 'dynamics')}
-                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
-                        >
-                          <span>SPECTRUM DYNAMICS</span>
-                          <span>{activeSpecSection === 'dynamics' ? '▼' : '▶'}</span>
-                        </button>
-                        {activeSpecSection === 'dynamics' && (
-                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Sample Out Count (Jumlah Bar)</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="2" max="64" step="1"
-                                  value={specConfig.sampleOutCount}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, sampleOutCount: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.sampleOutCount} bars</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
-                              <span className="editor-setting-label">MIRROR SAMPLES</span>
-                              <label className="editor-switch">
-                                <input 
-                                  type="checkbox" 
-                                  checked={specConfig.mirrorSamples} 
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, mirrorSamples: e.target.checked, repeatSamples: e.target.checked ? false : prev.repeatSamples }))} 
-                                />
-                                <span className="editor-switch-slider"></span>
-                              </label>
-                            </div>
-
-                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
-                              <span className="editor-setting-label">REPEAT SAMPLES</span>
-                              <label className="editor-switch">
-                                <input 
-                                  type="checkbox" 
-                                  checked={specConfig.repeatSamples} 
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, repeatSamples: e.target.checked, mirrorSamples: e.target.checked ? false : prev.mirrorSamples }))} 
-                                />
-                                <span className="editor-switch-slider"></span>
-                              </label>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Start and End Gap</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0" max="32" step="1"
-                                  value={specConfig.startEndGap}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, startEndGap: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.startEndGap} bars</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Temporal Smooth</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.05" max="0.95" step="0.05"
-                                  value={specConfig.temporalSmooth}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, temporalSmooth: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.temporalSmooth}</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Audio Filter Radius</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0" max="8" step="1"
-                                  value={specConfig.audioFilterRadius}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, audioFilterRadius: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.audioFilterRadius} px</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Audio Filter Strength</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0" max="1" step="0.05"
-                                  value={specConfig.audioFilterStrength}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, audioFilterStrength: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.audioFilterStrength}</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Bass Boost (Bar 1)</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.5" max="5.0" step="0.1"
-                                  value={specConfig.bassBoost1}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, bassBoost1: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.bassBoost1}x</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Bass Boost (Bar 2)</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.5" max="5.0" step="0.1"
-                                  value={specConfig.bassBoost2}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, bassBoost2: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.bassBoost2}x</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Mid Boost (Bar 3-4)</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.5" max="5.0" step="0.1"
-                                  value={specConfig.midBoost}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, midBoost: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.midBoost}x</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">High Boost (Bar 5-6)</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.5" max="5.0" step="0.1"
-                                  value={specConfig.highBoost}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, highBoost: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.highBoost}x</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Output Multiplier</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.1" max="5.0" step="0.1"
-                                  value={specConfig.outputMultiplier}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, outputMultiplier: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.outputMultiplier}x</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Section 3: Spectrum HZ Bounds */}
-                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <button 
-                          onClick={() => setActiveSpecSection(activeSpecSection === 'hz' ? null : 'hz')}
-                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
-                        >
-                          <span>SPECTRUM HZ BOUNDS</span>
-                          <span>{activeSpecSection === 'hz' ? '▼' : '▶'}</span>
-                        </button>
-                        {activeSpecSection === 'hz' && (
-                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Lower HZ Cutoff</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="10" max="500" step="5"
-                                  value={specConfig.lowerHzCutoff}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, lowerHzCutoff: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.lowerHzCutoff} Hz</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Middle HZ Cutoff</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="500" max="4000" step="50"
-                                  value={specConfig.middleHzCutoff}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, middleHzCutoff: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.middleHzCutoff} Hz</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Higher HZ Cutoff</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="4000" max="22000" step="100"
-                                  value={specConfig.higherHzCutoff}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, higherHzCutoff: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.higherHzCutoff} Hz</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-setting-card" style={{ background: 'none', border: 'none', padding: 0 }}>
-                              <span className="editor-setting-label">HZ DISTRIBUTION</span>
-                              <div className="editor-setting-options" style={{ display: 'flex', gap: '4px', marginTop: '6px' }}>
-                                <button 
-                                  className={`editor-opt-btn ${specConfig.hzDistribution === 'linear' ? 'active' : ''}`}
-                                  onClick={() => setSpecConfig(prev => ({ ...prev, hzDistribution: 'linear' }))}
-                                  style={{ flex: 1, padding: '6px' }}
-                                >Linear</button>
-                                <button 
-                                  className={`editor-opt-btn ${specConfig.hzDistribution === 'log' ? 'active' : ''}`}
-                                  onClick={() => setSpecConfig(prev => ({ ...prev, hzDistribution: 'log' }))}
-                                  style={{ flex: 1, padding: '6px' }}
-                                >Logarithmic</button>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Frequency Shift</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="-50" max="50" step="1"
-                                  value={specConfig.frequencyShift}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, frequencyShift: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.frequencyShift} bins</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Section 4: Bars Styling */}
-                      <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <button 
-                          onClick={() => setActiveSpecSection(activeSpecSection === 'styling' ? null : 'styling')}
-                          style={{ width: '100%', padding: '12px', background: 'none', border: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff', fontSize: '12px', fontWeight: '700', letterSpacing: '0.5px', cursor: 'pointer' }}
-                        >
-                          <span>BARS STYLING</span>
-                          <span>{activeSpecSection === 'styling' ? '▼' : '▶'}</span>
-                        </button>
-                        {activeSpecSection === 'styling' && (
-                          <div style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Color (RGBA/HEX)</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="text" 
-                                  value={specConfig.color}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, color: e.target.value }))}
-                                  style={{ flex: 1, background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff', padding: '6px', borderRadius: '4px', fontSize: '12px' }}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Glow Intensity</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0" max="20" step="1"
-                                  value={specConfig.glowIntensity}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, glowIntensity: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.glowIntensity} px</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Bar Width</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.5" max="15.0" step="0.5"
-                                  value={specConfig.barWidth}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, barWidth: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.barWidth} px</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Bar Gap</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0" max="15" step="0.5"
-                                  value={specConfig.barGap}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, barGap: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.barGap} px</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-toggle" style={{ justifyContent: 'space-between', padding: 0 }}>
-                              <span className="editor-setting-label">SYMMETRIC (UP/BOTTOM)</span>
-                              <label className="editor-switch">
-                                <input 
-                                  type="checkbox" 
-                                  checked={specConfig.symmetric} 
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, symmetric: e.target.checked }))} 
-                                />
-                                <span className="editor-switch-slider"></span>
-                              </label>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Height Scale</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0.1" max="5.0" step="0.1"
-                                  value={specConfig.heightScale}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, heightScale: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.heightScale}x</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Min Height Limit</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="0" max="10" step="0.5"
-                                  value={specConfig.minHeight}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, minHeight: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.minHeight} px</span>
-                              </div>
-                            </div>
-
-                            <div className="editor-fade-duration" style={{ padding: 0 }}>
-                              <span className="editor-setting-sublabel">Max Height Limit</span>
-                              <div className="editor-fade-input-wrap">
-                                <input 
-                                  type="range" 
-                                  min="10" max="150" step="5"
-                                  value={specConfig.maxHeight}
-                                  onChange={(e) => setSpecConfig(prev => ({ ...prev, maxHeight: Number(e.target.value) }))}
-                                  className="editor-fade-slider"
-                                />
-                                <span className="editor-fade-value">{specConfig.maxHeight} px</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
