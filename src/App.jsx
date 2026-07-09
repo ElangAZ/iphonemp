@@ -3,6 +3,24 @@ import './App.css';
 import KeyAuthGate from './KeyAuthGate';
 
 const calculateSpectrum = (dataArray, sampleRate, fftSize, config) => {
+  if (!config.customEnabled) {
+    const legacyOutCount = 6;
+    const rawSamples = new Array(legacyOutCount).fill(0);
+    if (dataArray && dataArray.length > 0) {
+      let bassSum = 0;
+      for (let b = 0; b <= 1; b++) bassSum += (dataArray[b] || 0);
+      const bassAvg = bassSum / 2;
+      rawSamples[0] = bassAvg > 145 ? (bassAvg - 145) * 1.6 : 0;
+
+      const freqBins = [20, 36, 56, 80, 110];
+      for (let i = 1; i < legacyOutCount; i++) {
+        const dataIdx = freqBins[i - 1] || 20;
+        rawSamples[i] = dataArray[dataIdx] || 0;
+      }
+    }
+    return rawSamples;
+  }
+
   if (!dataArray || dataArray.length === 0) {
     return new Array(config.sampleOutCount).fill(0);
   }
@@ -195,6 +213,7 @@ function App() {
   const [nativeRenderUri, setNativeRenderUri] = useState('');
 
   const [specConfig, setSpecConfig] = useState({
+    customEnabled: false,
     provider: 'spectrum',
     captureDuration: 100,
     highQuality: false,
@@ -1943,10 +1962,10 @@ function App() {
           ctx.fillText(songArtist, detailsX, detailsTop + 48);
 
           // Spectrum (right-aligned with the artist line)
-          const specBarCount = specConfig.sampleOutCount;
-          const specGap = specConfig.barGap;
-          const specHeight = 80;
-          const specBarWidth = specConfig.barWidth;
+          const specBarCount = specConfig.customEnabled ? specConfig.sampleOutCount : 6;
+          const specGap = specConfig.customEnabled ? specConfig.barGap : 2;
+          const specHeight = specConfig.customEnabled ? 80 : 36;
+          const specBarWidth = specConfig.customEnabled ? specConfig.barWidth : 2;
           const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
           const specX = detailsX + detailsW - specTotalWidth;
           const specCenterY = detailsTop + 42; // Aligned near the artist name
@@ -1955,26 +1974,37 @@ function App() {
           
           for (let i = 0; i < specBarCount; i++) {
             const val = processedArray[i] || 0;
-            const normalized = Math.pow(val / 255, 1.8);
-            let targetHeight = normalized * (specHeight / 2) * specConfig.heightScale;
-            targetHeight = Math.max(specConfig.minHeight, Math.min(specConfig.maxHeight, targetHeight));
             
-            const decayRate = specConfig.temporalSmooth;
+            let targetHeight;
+            if (specConfig.customEnabled) {
+              const normalized = Math.pow(val / 255, 1.8);
+              targetHeight = normalized * (specHeight / 2) * specConfig.heightScale;
+              targetHeight = Math.max(specConfig.minHeight, Math.min(specConfig.maxHeight, targetHeight));
+            } else {
+              const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+              targetHeight = normalized * (specHeight / 2);
+            }
+            
+            const decayRate = specConfig.customEnabled ? specConfig.temporalSmooth : 0.75;
             if (targetHeight > videoSmoothHeights[i]) { videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0; }
             else { videoSmoothHeights[i] -= (videoSmoothHeights[i] - targetHeight) * decayRate; }
             
             const currentHeight = videoSmoothHeights[i];
-            const halfH = specConfig.symmetric ? Math.max(specConfig.minHeight, currentHeight / 2) : Math.max(specConfig.minHeight, currentHeight);
+            const isSymmetric = specConfig.customEnabled ? specConfig.symmetric : true;
+            const minH = specConfig.customEnabled ? specConfig.minHeight : 1.0;
+            const halfH = isSymmetric ? Math.max(minH, currentHeight / 2) : Math.max(minH, currentHeight);
             const bx = specX + i * (specBarWidth + specGap);
 
             ctx.save();
-            if (specConfig.glowIntensity > 0) {
-              ctx.shadowBlur = specConfig.glowIntensity;
-              ctx.shadowColor = specConfig.color;
+            const glow = specConfig.customEnabled ? specConfig.glowIntensity : 0;
+            const barColor = specConfig.customEnabled ? specConfig.color : 'rgba(255, 255, 255, 0.5)';
+            if (glow > 0) {
+              ctx.shadowBlur = glow;
+              ctx.shadowColor = barColor;
             }
-            ctx.fillStyle = specConfig.color;
+            ctx.fillStyle = barColor;
 
-            if (specConfig.symmetric) {
+            if (isSymmetric) {
               ctx.beginPath();
               ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, specBarWidth / 2.5);
               ctx.fill();
@@ -2272,11 +2302,10 @@ function App() {
           ctx.font = '500 20px Inter';
           ctx.fillText(songArtist, cardX + artPadding, infoY + 30);
 
-          // Draw Spectrum
-          const specBarCount = specConfig.sampleOutCount;
-          const specGap = specConfig.barGap;
-          const specHeight = 100;
-          const specBarWidth = specConfig.barWidth;
+          const specBarCount = specConfig.customEnabled ? specConfig.sampleOutCount : 6;
+          const specGap = specConfig.customEnabled ? specConfig.barGap : 2;
+          const specHeight = specConfig.customEnabled ? 100 : 40;
+          const specBarWidth = specConfig.customEnabled ? specConfig.barWidth : 2;
           const specTotalWidth = specBarCount * specBarWidth + (specBarCount - 1) * specGap;
           const specX = cardX + cardWidth - artPadding - specTotalWidth;
           const specCenterY = infoY + 10;
@@ -2285,11 +2314,18 @@ function App() {
 
           for (let i = 0; i < specBarCount; i++) {
             const val = processedArray[i] || 0;
-            const normalized = Math.pow(val / 255, 1.8);
-            let targetHeight = normalized * (specHeight / 2) * specConfig.heightScale;
-            targetHeight = Math.max(specConfig.minHeight, Math.min(specConfig.maxHeight, targetHeight));
             
-            const decayRate = specConfig.temporalSmooth;
+            let targetHeight;
+            if (specConfig.customEnabled) {
+              const normalized = Math.pow(val / 255, 1.8);
+              targetHeight = normalized * (specHeight / 2) * specConfig.heightScale;
+              targetHeight = Math.max(specConfig.minHeight, Math.min(specConfig.maxHeight, targetHeight));
+            } else {
+              const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+              targetHeight = normalized * (specHeight / 2);
+            }
+            
+            const decayRate = specConfig.customEnabled ? specConfig.temporalSmooth : 0.75;
             if (targetHeight > videoSmoothHeights[i]) {
               videoSmoothHeights[i] += (targetHeight - videoSmoothHeights[i]) * 1.0;
             } else {
@@ -2297,17 +2333,21 @@ function App() {
             }
             
             const currentHeight = videoSmoothHeights[i];
-            const halfH = specConfig.symmetric ? Math.max(specConfig.minHeight, currentHeight / 2) : Math.max(specConfig.minHeight, currentHeight);
+            const isSymmetric = specConfig.customEnabled ? specConfig.symmetric : true;
+            const minH = specConfig.customEnabled ? specConfig.minHeight : 1.0;
+            const halfH = isSymmetric ? Math.max(minH, currentHeight / 2) : Math.max(minH, currentHeight);
             const bx = specX + i * (specBarWidth + specGap);
 
             ctx.save();
-            if (specConfig.glowIntensity > 0) {
-              ctx.shadowBlur = specConfig.glowIntensity;
-              ctx.shadowColor = specConfig.color;
+            const glow = specConfig.customEnabled ? specConfig.glowIntensity : 0;
+            const barColor = specConfig.customEnabled ? specConfig.color : 'rgba(255, 255, 255, 0.5)';
+            if (glow > 0) {
+              ctx.shadowBlur = glow;
+              ctx.shadowColor = barColor;
             }
-            ctx.fillStyle = specConfig.color;
+            ctx.fillStyle = barColor;
 
-            if (specConfig.symmetric) {
+            if (isSymmetric) {
               ctx.beginPath();
               ctx.roundRect(bx, specCenterY - halfH, specBarWidth, halfH, specBarWidth / 2.5);
               ctx.fill();
@@ -3014,7 +3054,7 @@ function App() {
         }
       }
 
-      const barCount = config.sampleOutCount;
+      const barCount = config.customEnabled ? config.sampleOutCount : 6;
 
       const canvases = [
         { el: uiCanvasRef.current, smooths: [] },
@@ -3051,10 +3091,10 @@ function App() {
         const centerY = height / 2;
         ctx.clearRect(0, 0, width, height);
 
-        let gap = config.barGap;
-        let barWidth = config.barWidth;
+        let gap = config.customEnabled ? config.barGap : 2;
+        let barWidth = config.customEnabled ? config.barWidth : 2;
         let totalWidth = barCount * barWidth + (barCount - 1) * gap;
-        if (totalWidth > width) {
+        if (config.customEnabled && totalWidth > width) {
           const scale = width / (totalWidth || 1);
           barWidth = Math.max(1, barWidth * scale);
           gap = Math.max(0.5, gap * scale);
@@ -3065,11 +3105,18 @@ function App() {
         
         for (let i = 0; i < barCount; i++) {
           const val = processedArray[i] || 0;
-          const normalized = Math.pow(val / 255, 1.8);
-          let targetHeight = normalized * height * config.heightScale;
-          targetHeight = Math.max(config.minHeight, Math.min(config.maxHeight, targetHeight));
           
-          const decayRate = config.temporalSmooth;
+          let targetHeight;
+          if (config.customEnabled) {
+            const normalized = Math.pow(val / 255, 1.8);
+            targetHeight = normalized * height * config.heightScale;
+            targetHeight = Math.max(config.minHeight, Math.min(config.maxHeight, targetHeight));
+          } else {
+            const normalized = Math.pow(val / 255, 1.8) * (i === 1 ? 0.22 : 0.65);
+            targetHeight = normalized * height;
+          }
+          
+          const decayRate = config.customEnabled ? config.temporalSmooth : 0.75;
           if (targetHeight > smooths[i]) {
             smooths[i] += (targetHeight - smooths[i]) * 1.0;
           } else {
@@ -3077,17 +3124,21 @@ function App() {
           }
 
           const currentHeight = smooths[i];
-          const halfH = config.symmetric ? Math.max(config.minHeight, currentHeight / 2) : Math.max(config.minHeight, currentHeight);
+          const isSymmetric = config.customEnabled ? config.symmetric : true;
+          const minH = config.customEnabled ? config.minHeight : 1.0;
+          const halfH = isSymmetric ? Math.max(minH, currentHeight / 2) : Math.max(minH, currentHeight);
           const x = offsetX + i * (barWidth + gap);
 
           ctx.save();
-          if (config.glowIntensity > 0) {
-            ctx.shadowBlur = config.glowIntensity;
-            ctx.shadowColor = config.color;
+          const glow = config.customEnabled ? config.glowIntensity : 0;
+          const barColor = config.customEnabled ? config.color : 'rgba(255, 255, 255, 0.5)';
+          if (glow > 0) {
+            ctx.shadowBlur = glow;
+            ctx.shadowColor = barColor;
           }
-          ctx.fillStyle = config.color;
+          ctx.fillStyle = barColor;
 
-          if (config.symmetric) {
+          if (isSymmetric) {
             ctx.beginPath();
             ctx.roundRect(x, centerY - halfH, barWidth, halfH, barWidth / 2.5);
             ctx.fill();
@@ -3568,8 +3619,41 @@ function App() {
               </button>
             </div>
 
+            {/* Custom Enable Toggle */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              background: 'rgba(255, 255, 255, 0.04)',
+              border: '1px solid rgba(255, 255, 255, 0.08)',
+              padding: '14px 16px',
+              borderRadius: '12px',
+              marginBottom: '20px',
+              boxSizing: 'border-box'
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ color: '#fff', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px' }}>KUSTOMISASI SPECTRUM</span>
+                <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10.5px', fontWeight: '500' }}>Aktifkan setelan edit di bawah</span>
+              </div>
+              <label className="editor-switch">
+                <input 
+                  type="checkbox" 
+                  checked={specConfig.customEnabled} 
+                  onChange={(e) => setSpecConfig(prev => ({ ...prev, customEnabled: e.target.checked }))} 
+                />
+                <span className="editor-switch-slider"></span>
+              </label>
+            </div>
+
             {/* Preset Actions */}
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px' }}>
+            <div style={{ 
+              display: 'flex', 
+              gap: '8px', 
+              marginBottom: '20px',
+              opacity: specConfig.customEnabled ? 1 : 0.4,
+              pointerEvents: specConfig.customEnabled ? 'auto' : 'none',
+              transition: 'all 0.3s ease'
+            }}>
               <button 
                 onClick={exportPreset} 
                 className="editor-opt-btn" 
@@ -3587,7 +3671,14 @@ function App() {
             </div>
 
             {/* Config Panels */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div style={{ 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '10px',
+              opacity: specConfig.customEnabled ? 1 : 0.4,
+              pointerEvents: specConfig.customEnabled ? 'auto' : 'none',
+              transition: 'all 0.3s ease'
+            }}>
               {/* Section 1: Audio Capture & Source */}
               <div style={{ background: 'rgba(255,255,255,0.03)', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <button 
